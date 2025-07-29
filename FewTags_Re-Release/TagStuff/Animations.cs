@@ -80,10 +80,10 @@ namespace FewTags.TagStuff
                 BounceAnimation(textComponent, originalText.Replace(".CYLN.", ""));
     
             if (Rainbow)
-                RainbowAnimation(textComponent, FewTags.FewTags.RemoveHtmlTags(originalText).Replace(".RAIN.", ""));
+                RainbowAnimation(textComponent, Main.RemoveHtmlTags(originalText).Replace(".RAIN.", ""));
     
             if (SmoothRainbow)
-                SmoothRainbowAnimation(textComponent, FewTags.FewTags.RemoveHtmlTags(originalText).Replace(".SR.", ""));
+                SmoothRainbowAnimation(textComponent, Main.RemoveHtmlTags(originalText).Replace(".SR.", ""));
     
             if (Pulse)
                 PopPulseAnimation(textComponent, originalText.Replace(".PULSE.", ""));
