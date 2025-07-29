@@ -29,6 +29,7 @@ namespace FewTags.TagStuff
 
         private static readonly Queue<StringBuilder> stringBuilderPool = new Queue<StringBuilder>();
         private static readonly object poolLock = new object();
+        private const int MAX_POOL_SIZE = 200;
 
         public bool LetterByLetter = false, SmoothRainbow = false, Rainbow = false, Bounce = false, Jump = false, Pulse = false, Shake = false, GhostTrail = false, Blink = false, Glitch = false;
         public string originalText = string.Empty;
@@ -108,15 +109,17 @@ namespace FewTags.TagStuff
 
         private static void ReturnStringBuilder(StringBuilder sb)
         {
+            if (sb == null) return;
+            
             lock (poolLock)
             {
-                if (stringBuilderPool.Count < 35)
+                if (stringBuilderPool.Count < MAX_POOL_SIZE)
                 {
                     stringBuilderPool.Enqueue(sb);
                 }
             }
         }
-
+        
         private List<TextPart> GetCachedParts(string text)
         {
             if (text != cachedOriginalText || cachedParts == null)
