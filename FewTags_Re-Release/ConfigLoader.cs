@@ -27,6 +27,7 @@ namespace FewTags
                         ["MaxPlateSize"] = 691,
                         ["FallbackSize"] = 80,
                         ["MaxTagLength"] = 25000,
+                        ["UpdateIntervalMinutes"] = 1,
                         ["BlacklistedUserIDs"] = new JSONArray()
                     };
 
@@ -52,6 +53,7 @@ namespace FewTags
                 Main.MaxPlateSize = json["MaxPlateSize"].AsInt;
                 Main.FallbackSize = json["FallbackSize"].AsInt;
                 Main.MaxTagLength = json["MaxTagLength"].AsInt;
+                Main.UpdateIntervalMinutes = json["UpdateIntervalMinutes"].AsInt;
 
                 Main.BlacklistedUserIDs.Clear();
                 if (json["BlacklistedUserIDs"] is JSONArray array)
@@ -66,4 +68,43 @@ namespace FewTags
             }
         }
     }
+
+    internal static void Save() // save current settings to config
+        {
+            try
+            {
+                var config = new JSONObject
+                {
+                    ["CleanseTags"] = Main.CleanseTags,
+                    ["ReplaceInsteadOfSkip"] = Main.ReplaceInsteadOfSkip,
+                    ["EnableAnimations"] = Main.EnableAnimations,
+                    ["IsOverlay"] = Main.isOverlay,
+                    ["BeepOnReuploaderDetected"] = Main.BeepOnReuploaderDetected,
+                    ["DisableBigPlates"] = Main.DisableBigPlates,
+                    ["NoHTMLForMain"] = Main.NoHTMLForMain,
+                    ["MaxNewlinesPerPlate"] = Main.MaxNewlinesPerPlate,
+                    ["MaxPlatesPerUser"] = Main.MaxPlatesPerUser,
+                    ["MaxPlateSize"] = Main.MaxPlateSize,
+                    ["FallbackSize"] = Main.FallbackSize,
+                    ["MaxTagLength"] = Main.MaxTagLength,
+                    ["UpdateIntervalMinutes"] = Main.UpdateIntervalMinutes,
+                    ["BlacklistedUserIDs"] = new JSONArray()
+                };
+
+                foreach (var userId in Main.BlacklistedUserIDs)
+                {
+                    config["BlacklistedUserIDs"].AsArray.Add(userId);
+                }
+
+                string directory = Path.GetDirectoryName(ConfigPath);
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
+
+                File.WriteAllText(ConfigPath, config.ToString(2));
+            }
+            catch
+            {
+
+            }
+        }
 }
