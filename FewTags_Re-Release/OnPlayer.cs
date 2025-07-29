@@ -37,6 +37,13 @@ namespace FewTags
             {
                 Main.p.Remove(__0);
             }
+
+            try
+            {
+                CleanupPlayerFewTags(__0);
+            }
+            catch { }
+            
             return;
         }
 
@@ -58,6 +65,71 @@ namespace FewTags
                     Main.p.Add(__0);
                 }
                 Main.NameplateESP(__0);
+            }
+        }
+
+        public static void CleanupAllFewTags()
+        {
+            try
+            {
+                var allAnimators = GameObject.FindObjectsOfType<TagAnimator>();
+                if (allAnimators.Length > 0)
+                {
+                    foreach (var animator in allAnimators)
+                    {
+                        if (animator != null)
+                        {
+                            animator.enabled = false;
+                            if (animator.gameObject.name.Contains("FewTagsPlate"))
+                            {
+                                GameObject.Destroy(animator.gameObject);
+                            }
+                            else
+                            {
+                                GameObject.Destroy(animator);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                string msg = $"Error in global FewTags cleanup: {ex.Message}";
+                // log msg here
+            }
+        }
+
+        private static void CleanupPlayerFewTags(VRC.Player player)
+        {
+            try
+            {
+                if (player?.gameObject == null) return;
+                
+                var plates = player.gameObject.GetComponentsInChildren<TagAnimator>();
+                if (plates.Length > 0)
+                {
+                    foreach (var animator in plates)
+                    {
+                        if (animator != null)
+                        {
+                            animator.enabled = false;
+        
+                            if (animator.gameObject.name.Contains("FewTags"))
+                            {
+                                GameObject.Destroy(animator.gameObject);
+                            }
+                            else
+                            {
+                                GameObject.Destroy(animator);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                string msg = $"Error cleaning up FewTags for player {player?.APIUser?.displayName}: {ex.Message}";
+                // log msg here
             }
         }
     }
