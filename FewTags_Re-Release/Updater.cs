@@ -20,7 +20,7 @@ namespace FewTags
 
             if (Time.realtimeSinceStartup >= updateInterval)
             {
-                updateInterval = Time.realtimeSinceStartup + 60f;
+                updateInterval = Time.realtimeSinceStartup + (Main.UpdateIntervalMinutes * 60f);
                 Main.UpdateTags();
                 ConfigLoader.Load();
             }
