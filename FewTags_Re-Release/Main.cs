@@ -10,7 +10,7 @@ namespace FewTags
     public class Main
     {
         internal const string url = "https://raw.githubusercontent.com/Fewdys/FewTags/main/FewTags.json";
-        internal static int MaxPlatesPerUser, MaxNewlinesPerPlate, MaxPlateSize, FallbackSize, MaxTagLength;
+        internal static int MaxPlatesPerUser, MaxNewlinesPerPlate, MaxPlateSize, FallbackSize, MaxTagLength, UpdateIntervalMinutes;
         internal static HashSet<string> BlacklistedUserIDs = new HashSet<string>();
         internal static bool CleanseTags, EnableAnimations, BeepOnReuploaderDetected, ReplaceInsteadOfSkip, isOverlay, DisableBigPlates, NoHTMLForMain;
         internal const float Position = -103.95f, PositionTags = -131.95f, PositionID = -75.95f, PositionBigText = 344.75f;
