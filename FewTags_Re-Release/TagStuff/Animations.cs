@@ -472,7 +472,7 @@ namespace FewTags.TagStuff
         {
             if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
     
-            if (updateCounter % 2 == 0) return;
+            if (updateCounter % 4 == 0) return;
             
             glitchTimer += Time.deltaTime * GLITCH_SPEED;
             
