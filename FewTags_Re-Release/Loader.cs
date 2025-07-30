@@ -30,6 +30,8 @@ namespace FewTags
             Log = base.Log;
             //harmony = new Harmony(PluginInfo.PLUGIN_GUID);
 
+            ClassInjector.RegisterTypeInIl2Cpp<TagAnimator>();
+            
             OnPlayer.PatchOnPlayer();
             ConfigLoader.Load();
             Main.UpdateTags();
@@ -50,6 +52,8 @@ namespace FewTags
         {
             // ^ Used To Be OnApplicationLateStart() ^ //
             //new WaitForSeconds(3f);
+            ClassInjector.RegisterTypeInIl2Cpp<TagAnimator>();
+            
             OnPlayer.PatchOnPlayer();
             ConfigLoader.Load();
             Main.UpdateTags();
