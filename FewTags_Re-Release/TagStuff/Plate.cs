@@ -167,8 +167,6 @@ namespace FewTags
         public GameObject? _gameObjectBP { get; set; }
         public GameObject? _gameObjectM { get; set; }
         public GameObject? _gameObjectID { get; set; }
-        public TagAnimator? Animator { get; set; }
-        public string? Tag { get; set; }
 
         ~PlateStatic()
         {
@@ -183,8 +181,6 @@ namespace FewTags
             TextBP = null;
             TextM = null;
             TextID = null;
-            Animator = null;
-            Tag = null;
         }
 
         public PlateStatic(VRC.Player __0)
@@ -280,39 +276,6 @@ namespace FewTags
                 Cleanup();
                 return;
             }
-            if (!string.IsNullOrEmpty(Tag))
-            {
-                string lowerTag = Main.RemoveHtmlTags(Tag).ToLower();
-                bool needsAnimator = Main.EnableAnimations &&
-                (
-                    lowerTag.StartsWith(".lbl.") ||
-                    lowerTag.StartsWith(".cyln.") ||
-                    lowerTag.StartsWith(".rain.") ||
-                    lowerTag.StartsWith(".sr.") ||
-                    lowerTag.StartsWith(".pulse.") ||
-                    lowerTag.StartsWith(".jump.") ||
-                    lowerTag.StartsWith(".shake.") ||
-                    lowerTag.StartsWith(".gt.") ||
-                    lowerTag.StartsWith(".blink.") ||
-                    lowerTag.StartsWith(".glitch.")
-                );
-    
-                if (needsAnimator)
-                {
-                    Animator = _gameObjectBP.AddComponent<TagAnimator>();
-                    Animator.originalText = Tag;
-                    if (lowerTag.StartsWith(".lbl.")) Animator.LetterByLetter = true;
-                    else if (lowerTag.StartsWith(".cyln.")) Animator.Bounce = true;
-                    else if (lowerTag.StartsWith(".rain.")) Animator.Rainbow = true;
-                    else if (lowerTag.StartsWith(".sr.")) Animator.SmoothRainbow = true;
-                    else if (lowerTag.StartsWith(".pulse.")) Animator.Pulse = true;
-                    else if (lowerTag.StartsWith(".jump.")) Animator.Jump = true;
-                    else if (lowerTag.StartsWith(".shake.")) Animator.Shake = true;
-                    else if (lowerTag.StartsWith(".gt.")) Animator.GhostTrail = true;
-                    else if (lowerTag.StartsWith(".blink.")) Animator.Blink = true;
-                    else if (lowerTag.StartsWith(".glitch.")) Animator.Glitch = true;
-                }
-            }
 
             _gameObjectBP.name = "FewTagsBigPlate";
             TextBP = _gameObjectBP.transform.Find("Trust Text").GetComponent<TextMeshProUGUI>();
@@ -340,12 +303,13 @@ namespace FewTags
             _gameObjectBP.transform.localPosition = new UnityEngine.Vector3(0, Main.PositionBigText, 0);
             _gameObjectBP.transform.GetComponent<ImageThreeSlice>().enabled = false;
             _gameObjectBP.SetActive(true);
-            TextBP.text = Tag ?? "";
+            TextBP.text = "";
             TextBP.isOverlay = Main.isOverlay;
         }
     }
 
 }
+
 
 
 
