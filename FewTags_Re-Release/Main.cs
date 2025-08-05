@@ -171,7 +171,7 @@ namespace FewTags
                         platestatic.TextBP.text = s_stringInstance + founduser.PlateBigText;
                     }
 
-                    string lowerTag = platestatic.TextBP.text.ToLower();
+                    string lowerTag = founduser.PlateBigText.ToLower();
                     bool needsAnimator = Main.EnableAnimations &&
                     (
                         lowerTag.StartsWith(".lbl.") ||
@@ -279,6 +279,7 @@ namespace FewTags
         }
     }
 }
+
 
 
 
