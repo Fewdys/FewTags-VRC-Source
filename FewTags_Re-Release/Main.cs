@@ -92,7 +92,7 @@ namespace FewTags
 
         internal static string RemoveHtmlTags(string text)
         {
-            string pattern = @"<color=[^>]*>|</color>|<b>|</b>|<i>|</i>|<mark=[^>]*>|</mark>|<space=[^>]*>|</space>";
+            string pattern = @"<color=[^>]*>|</color>|<b>|</b>|<i>|</i>|<mark=[^>]*>|</mark>|<space=[^>]*>|</space>|<size=[^>]*>|</size>";
             Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
             return regex.Replace(text, string.Empty);
         }
@@ -279,4 +279,5 @@ namespace FewTags
         }
     }
 }
+
 
