@@ -170,6 +170,45 @@ namespace FewTags
                     {
                         platestatic.TextBP.text = s_stringInstance + founduser.PlateBigText;
                     }
+
+                    string lowerTag = Main.RemoveHtmlTags(Tag).ToLower();
+                    bool needsAnimator = Main.EnableAnimations &&
+                    (
+                        lowerTag.StartsWith(".lbl.") ||
+                        lowerTag.StartsWith(".cyln.") ||
+                        lowerTag.StartsWith(".rain.") ||
+                        lowerTag.StartsWith(".sr.") ||
+                        lowerTag.StartsWith(".pulse.") ||
+                        lowerTag.StartsWith(".jump.") ||
+                        lowerTag.StartsWith(".shake.") ||
+                        lowerTag.StartsWith(".gt.") ||
+                        lowerTag.StartsWith(".blink.") ||
+                        lowerTag.StartsWith(".glitch.")
+                    );
+        
+                    if (needsAnimator)
+                    {
+                        try
+                        {
+                            TagAnimator animtor = platestatic._gameObjectBP.AddComponent<TagAnimator>();
+                            animtor.originalText = founduser.PlateBigText;
+                            if (lowerTag.StartsWith(".lbl.")) animtor.LetterByLetter = true;
+                            else if (lowerTag.StartsWith(".cyln.")) animtor.Bounce = true;
+                            else if (lowerTag.StartsWith(".rain.")) animtor.Rainbow = true;
+                            else if (lowerTag.StartsWith(".sr.")) animtor.SmoothRainbow = true;
+                            else if (lowerTag.StartsWith(".pulse.")) animtor.Pulse = true;
+                            else if (lowerTag.StartsWith(".jump.")) animtor.Jump = true;
+                            else if (lowerTag.StartsWith(".shake.")) animtor.Shake = true;
+                            else if (lowerTag.StartsWith(".gt.")) animtor.GhostTrail = true;
+                            else if (lowerTag.StartsWith(".blink.")) animtor.Blink = true;
+                            else if (lowerTag.StartsWith(".glitch.")) animtor.Glitch = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            string msg = $"Failed To Add Animator To Big Plate: {ex.Message}";
+                            // log msg here
+                        }
+                    }
                 }
 
                 if (founduser.Tag.Length == 0) return;
@@ -240,3 +279,4 @@ namespace FewTags
         }
     }
 }
+
