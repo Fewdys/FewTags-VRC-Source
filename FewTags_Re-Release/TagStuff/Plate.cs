@@ -167,6 +167,7 @@ namespace FewTags
         public GameObject? _gameObjectBP { get; set; }
         public GameObject? _gameObjectM { get; set; }
         public GameObject? _gameObjectID { get; set; }
+        public TagAnimator? Animator { get; set; }
 
         ~PlateStatic()
         {
@@ -181,6 +182,7 @@ namespace FewTags
             TextBP = null;
             TextM = null;
             TextID = null;
+            Animator = null;
         }
 
         public PlateStatic(VRC.Player __0)
@@ -340,3 +342,4 @@ namespace FewTags
     }
 
 }
+
