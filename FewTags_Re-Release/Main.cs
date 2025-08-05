@@ -209,6 +209,10 @@ namespace FewTags
                             // log msg here
                         }
                     }
+                    else if (!EnableAnimations)
+                    {
+                        platestatic.TextBP.text = platestatic.TextBP.text.Replace(".LBL.", "").Replace(".CYLN.", "").Replace(".RAIN.", "").Replace(".SR.", "").Replace(".PULSE.", "").Replace(".JUMP.", "").Replace(".SHAKE.", "").Replace(".GT.", "").Replace(".BLINK.", "").Replace(".GLITCH.", "");
+                    }
                 }
 
                 if (founduser.Tag.Length == 0) return;
@@ -233,6 +237,11 @@ namespace FewTags
                     if (CleanseTags)
                     {
                         tag = TagCleanser.CleansePlate(tag, vrcPlayer);
+                    }
+
+                    if (!EnableAnimations)
+                    {
+                        tag = tag.Replace(".LBL.", "").Replace(".CYLN.", "").Replace(".RAIN.", "").Replace(".SR.", "").Replace(".PULSE.", "").Replace(".JUMP.", "").Replace(".SHAKE.", "").Replace(".GT.", "").Replace(".BLINK.", "").Replace(".GLITCH.", "");
                     }
 
                     // check for newlines & length
@@ -279,6 +288,7 @@ namespace FewTags
         }
     }
 }
+
 
 
 
