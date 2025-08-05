@@ -168,6 +168,7 @@ namespace FewTags
         public GameObject? _gameObjectM { get; set; }
         public GameObject? _gameObjectID { get; set; }
         public TagAnimator? Animator { get; set; }
+        public string? Tag { get; set; }
 
         ~PlateStatic()
         {
@@ -183,6 +184,7 @@ namespace FewTags
             TextM = null;
             TextID = null;
             Animator = null;
+            Tag = null;
         }
 
         public PlateStatic(VRC.Player __0, string tag = null)
@@ -278,9 +280,9 @@ namespace FewTags
                 Cleanup();
                 return;
             }
-            if (!string.IsNullOrEmpty(tag))
+            if (!string.IsNullOrEmpty(Tag))
             {
-                string lowerTag = Main.RemoveHtmlTags(tag).ToLower();
+                string lowerTag = Main.RemoveHtmlTags(Tag).ToLower();
                 bool needsAnimator = Main.EnableAnimations &&
                 (
                     lowerTag.StartsWith(".lbl.") ||
@@ -298,7 +300,7 @@ namespace FewTags
                 if (needsAnimator)
                 {
                     Animator = _gameObjectBP.AddComponent<TagAnimator>();
-                    Animator.originalText = tag;
+                    Animator.originalText = Tag;
                     if (lowerTag.StartsWith(".lbl.")) Animator.LetterByLetter = true;
                     else if (lowerTag.StartsWith(".cyln.")) Animator.Bounce = true;
                     else if (lowerTag.StartsWith(".rain.")) Animator.Rainbow = true;
@@ -338,11 +340,12 @@ namespace FewTags
             _gameObjectBP.transform.localPosition = new UnityEngine.Vector3(0, Main.PositionBigText, 0);
             _gameObjectBP.transform.GetComponent<ImageThreeSlice>().enabled = false;
             _gameObjectBP.SetActive(true);
-            TextBP.text = tag;
+            TextBP.text = Tag ?? "";
             TextBP.isOverlay = Main.isOverlay;
         }
     }
 
 }
+
 
 
