@@ -171,7 +171,7 @@ namespace FewTags
                         platestatic.TextBP.text = s_stringInstance + founduser.PlateBigText;
                     }
 
-                    string lowerTag = Main.RemoveHtmlTags(Tag).ToLower();
+                    string lowerTag = founduser.PlateBigText.ToLower();
                     bool needsAnimator = Main.EnableAnimations &&
                     (
                         lowerTag.StartsWith(".lbl.") ||
@@ -221,7 +221,7 @@ namespace FewTags
                     if ((tag.Contains("Known Ripper/Reuploader") || tag == "Known Ripper/Reuploader") && BeepOnReuploaderDetected)
                         ConsoleUtils.AmongUsBeep(); // feel free to comment out if you don't use / have a console -- off by default in config
 
-                    var RemovedHTML = RemoveHtmlTags(tag);
+                    //var RemovedHTML = RemoveHtmlTags(tag);
 
                     if (string.IsNullOrEmpty(tag)) continue;
 
@@ -279,5 +279,6 @@ namespace FewTags
         }
     }
 }
+
 
 
