@@ -187,7 +187,7 @@ namespace FewTags
             Tag = null;
         }
 
-        public PlateStatic(VRC.Player __0, string tag = null)
+        public PlateStatic(VRC.Player __0)
         {
             if (__0?._vrcplayer?.Nameplate?.quickStats == null || __0._vrcplayer.Nameplate.contents == null)
             {
@@ -346,6 +346,7 @@ namespace FewTags
     }
 
 }
+
 
 
 
