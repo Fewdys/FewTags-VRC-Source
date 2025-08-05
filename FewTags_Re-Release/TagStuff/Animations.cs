@@ -266,30 +266,49 @@ namespace FewTags.TagStuff
         internal void PopPulseAnimation(TextMeshProUGUI textMeshPro, string originalText)
         {
             if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
-    
+        
             var parts = GetCachedParts(originalText);
             int estimatedCapacity = originalText.Length * 3;
             var sb = GetStringBuilder(estimatedCapacity);
             float t = Time.time * PULSE_SPEED;
             int visibleCharIndex = 0;
-    
+        
+            Stack<float> sizeStack = new Stack<float>();
+            sizeStack.Push(1.0f);
+        
             foreach (var part in parts)
             {
                 if (part.IsStyled)
                 {
+                    foreach (Match openTag in Regex.Matches(part.Text, @"<size=([+-]?\d+)%?>", RegexOptions.IgnoreCase))
+                    {
+                        if (float.TryParse(openTag.Groups[1].Value, out float parsedSize))
+                            sizeStack.Push(parsedSize / 30);
+                    }
+        
+                    int closeTagCount = Regex.Matches(part.Text, @"</size>", RegexOptions.IgnoreCase).Count;
+                    for (int i = 0; i < closeTagCount; i++)
+                    {
+                        if (sizeStack.Count > 1) // never pop default size
+                            sizeStack.Pop();
+                    }
+        
                     sb.Append(part.Text);
                 }
                 else
                 {
+                    float currentBaseSize = sizeStack.Peek();
+        
                     for (int i = 0; i < part.Text.Length; i++)
                     {
-                        float scale = 1f + Mathf.Sin(t - visibleCharIndex * 0.3f) * 0.2f;
-                        sb.Append($"<size={(scale * 100):F0}%>{part.Text[i]}</size>");
+                        float pulse = 1f + Mathf.Sin(t - visibleCharIndex * 0.3f) * 0.2f;
+                        float finalSize = currentBaseSize * pulse;
+                        sb.Append($"<size={(finalSize * 100):F0}%>{part.Text[i]}</size>");
                         visibleCharIndex++;
                     }
                 }
             }
-    
+        
             textMeshPro.text = sb.ToString();
         }
     
@@ -680,5 +699,6 @@ namespace FewTags.TagStuff
         }
     }
 }
+
 
 
