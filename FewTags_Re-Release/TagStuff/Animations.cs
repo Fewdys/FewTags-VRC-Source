@@ -98,7 +98,7 @@ namespace FewTags.TagStuff
                 GhostTrailAnimation(textComponent, originalText.Replace(".GT.", ""));
     
             if (Blink)
-                BlinkAnimation(textComponent, originalText.Replace(".BLINK.", ""));
+                BlinkAnimation(textComponent, Main.RemoveHtmlTags(originalText.Replace(".BLINK.", ""), true));
     
             if (Glitch)
                 GlitchAnimation(textComponent, originalText.Replace(".GLITCH.", ""));
@@ -680,3 +680,4 @@ namespace FewTags.TagStuff
         }
     }
 }
+
