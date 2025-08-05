@@ -90,9 +90,9 @@ namespace FewTags
             }
         }
 
-        internal static string RemoveHtmlTags(string text)
+        internal static string RemoveHtmlTags(string text, bool excludesize = false)
         {
-            string pattern = @"<color=[^>]*>|</color>|<b>|</b>|<i>|</i>|<mark=[^>]*>|</mark>|<space=[^>]*>|</space>|<size=[^>]*>|</size>";
+            string pattern = excludesize ? @"<color=[^>]*>|</color>|<b>|</b>|<i>|</i>|<mark=[^>]*>|</mark>|<space=[^>]*>|</space>" : @"<color=[^>]*>|</color>|<b>|</b>|<i>|</i>|<mark=[^>]*>|</mark>|<space=[^>]*>|</space>|<size=[^>]*>|</size>";
             Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
             return regex.Replace(text, string.Empty);
         }
@@ -171,7 +171,7 @@ namespace FewTags
                         platestatic.TextBP.text = s_stringInstance + founduser.PlateBigText;
                     }
 
-                    string lowerTag = founduser.PlateBigText.ToLower();
+                    string lowerTag = platestatic.TextBP.text.ToLower();
                     bool needsAnimator = Main.EnableAnimations &&
                     (
                         lowerTag.StartsWith(".lbl.") ||
@@ -191,7 +191,7 @@ namespace FewTags
                         try
                         {
                             TagAnimator animtor = platestatic._gameObjectBP.AddComponent<TagAnimator>();
-                            animtor.originalText = founduser.PlateBigText;
+                            animtor.originalText = platestatic.TextBP.text;
                             if (lowerTag.StartsWith(".lbl.")) animtor.LetterByLetter = true;
                             else if (lowerTag.StartsWith(".cyln.")) animtor.Bounce = true;
                             else if (lowerTag.StartsWith(".rain.")) animtor.Rainbow = true;
@@ -279,6 +279,7 @@ namespace FewTags
         }
     }
 }
+
 
 
 
