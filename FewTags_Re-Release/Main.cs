@@ -12,7 +12,7 @@ namespace FewTags
         internal const string url = "https://raw.githubusercontent.com/Fewdys/FewTags/main/FewTags.json";
         internal static int MaxPlatesPerUser, MaxNewlinesPerPlate, MaxPlateSize, FallbackSize, MaxTagLength, UpdateIntervalMinutes;
         internal static HashSet<string> BlacklistedUserIDs = new HashSet<string>();
-        internal static bool CleanseTags, EnableAnimations, BeepOnReuploaderDetected, ReplaceInsteadOfSkip, isOverlay, DisableBigPlates, NoHTMLForMain;
+        internal static bool CleanseTags, EnableAnimations, BeepOnReuploaderDetected, ReplaceInsteadOfSkip, isOverlay, DisableBigPlates, NoHTMLForMain, LimitNewLineOrLength;
         internal const float Position = -103.95f, PositionTags = -131.95f, PositionID = -75.95f, PositionBigText = 344.75f;
         internal static List<VRC.Player> p = new List<VRC.Player>();
 
@@ -151,24 +151,24 @@ namespace FewTags
 
                     if (exceedsNewlines || exceedsLength)
                     {
-                        if (ReplaceInsteadOfSkip)
+                        if (ReplaceInsteadOfSkip) // Replace with error message
                         {
                             if (exceedsNewlines)
                                 founduser.PlateBigText = TooManyLines;
                             else if (exceedsLength)
                                 founduser.PlateBigText = TooLargeStr;
-
-                            platestatic.TextBP.text = s_stringInstance + founduser.PlateBigText;
                         }
-                        else // skip/hide the plate entirely
+                        else if (LimitNewLineOrLength) // skip/hide the plate entirely
                         {
                             platestatic.TextBP.gameObject.SetActive(false);
                             platestatic.TextBP.enabled = false;
                         }
+                    
+                        platestatic.TextBP.text = s_stringInstance + founduser.PlateBigText;
                     }
                     else // valid or allowed through aids
                     {
-                        platestatic.TextBP.text = s_stringInstance + founduser.PlateBigText;
+                        platestatic.TextBP.text = s_stringInstance + founduser.PlateBigText; // set text
                     }
 
                     string lowerTag = founduser.PlateBigText.ToLower();
@@ -254,7 +254,7 @@ namespace FewTags
                         if (isTooLong) tag = TooLargeStr;
                         if (hasTooManyLines) tag = TooManyLines;
                     }
-                    else
+                    else if (LimitNewLineOrLength)
                     {
                         if (isTooLong || hasTooManyLines) continue; // skip tag -- disable
                     }
@@ -288,6 +288,7 @@ namespace FewTags
         }
     }
 }
+
 
 
 
