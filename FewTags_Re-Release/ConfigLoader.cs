@@ -22,6 +22,7 @@ namespace FewTags
                         ["BeepOnReuploaderDetected"] = false,
                         ["DisableBigPlates"] = false,
                         ["NoHTMLForMain"] = false,
+                        ["LimitNewLineOrLength"] = false,
                         ["MaxNewlinesPerPlate"] = 4,
                         ["MaxPlatesPerUser"] = 30,
                         ["MaxPlateSize"] = 691,
@@ -46,6 +47,7 @@ namespace FewTags
                 Main.EnableAnimations = json["EnableAnimations"].AsBool;
                 Main.isOverlay = json["IsOverlay"].AsBool;
                 Main.NoHTMLForMain = json["NoHTMLForMain"].AsBool;
+                Main.LimitNewLineOrLength = json["LimitNewLineOrLength"].AsBool;
                 Main.DisableBigPlates = json["DisableBigPlates"].AsBool;
                 Main.BeepOnReuploaderDetected = json["BeepOnReuploaderDetected"].AsBool;
                 Main.MaxPlatesPerUser = json["MaxPlatesPerUser"].AsInt;
@@ -82,6 +84,7 @@ namespace FewTags
                     ["BeepOnReuploaderDetected"] = Main.BeepOnReuploaderDetected,
                     ["DisableBigPlates"] = Main.DisableBigPlates,
                     ["NoHTMLForMain"] = Main.NoHTMLForMain,
+                    ["LimitNewLineOrLength"] = Main.LimitNewLineOrLength,
                     ["MaxNewlinesPerPlate"] = Main.MaxNewlinesPerPlate,
                     ["MaxPlatesPerUser"] = Main.MaxPlatesPerUser,
                     ["MaxPlateSize"] = Main.MaxPlateSize,
@@ -108,3 +111,4 @@ namespace FewTags
             }
         }
 }
+
