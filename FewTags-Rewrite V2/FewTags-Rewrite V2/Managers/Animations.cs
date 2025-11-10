@@ -220,59 +220,177 @@ namespace FewTags.FewTags
             return tag.Substring(start, end - start).ToLower();
         }
 
-        internal void ScrollAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        internal void ScrollAnimation(TextMeshProUGUI textMeshPro, string originalText, int minWindowChars = 14, int maxWindowChars = 26)
         {
+        
+            ///
+            /// IDK I GIVE UP, IF YOU USE COLOR TAGS IN UR TEXT JUST ENSURE TO MAKE THINGS WHITE FOR TEXT U WANT WHITE LOL
+            /// 
+        
             if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
-
+        
             string prefix = "";
             string textToScroll = originalText.Replace(".SCROLL.", "");
+        
+            // Handle [L] prefix
             if (textToScroll.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textToScroll = textToScroll.Substring(4); // remove "[L] " from scrollable portion
+                textToScroll = textToScroll.Substring(4);
             }
-
-            if (!textToScroll.EndsWith(" "))
-                textToScroll += " ";
-
-            var parts = GetCachedParts(textToScroll);
-
+        
+            if (!textToScroll.EndsWith(" ")) textToScroll += " ";
+        
+            var charList = new List<string>();
+            var regex = new Regex(@"(<.*?>)|(.{1})", RegexOptions.Singleline);
+            foreach (Match m in regex.Matches(textToScroll))
+                charList.Add(m.Value);
+        
+            int totalChars = charList.Count;
+            if (totalChars == 0) return;
+        
+            int visibleCharTotal = 0;
+            foreach (var c in charList)
+                if (!(c.StartsWith("<") && c.EndsWith(">")))
+                    visibleCharTotal++;
+        
+            int targetWindowChars;
+            if (visibleCharTotal <= minWindowChars)
+                targetWindowChars = visibleCharTotal;
+            else if (visibleCharTotal <= maxWindowChars)
+                targetWindowChars = Mathf.Max(minWindowChars, Mathf.CeilToInt(visibleCharTotal * 0.7f));
+            else
+                targetWindowChars = maxWindowChars;
+        
             scrollOffset += Time.unscaledDeltaTime * ScrollSpeed;
-            int visibleLength = cachedVisibleLength;
-            if (visibleLength <= 0) return;
-
-            int startIndex = Mathf.FloorToInt(scrollOffset) % visibleLength;
-
-            var sb = GetStringBuilder(originalText.Length * 3);
-            sb.Append(prefix); // always prepend local tag
-
-            int visibleSoFar = 0;
-
-            for (int i = 0; i < parts.Count; i++)
+            int startIndex = Mathf.FloorToInt(scrollOffset) % totalChars;
+        
+            int windowSize = 0;
+            int visibleCount = 0;
+            for (int i = 0; i < totalChars; i++)
             {
-                var part = parts[i];
-
-                if (part.IsStyled)
+                int idx = (startIndex + i) % totalChars;
+                windowSize++;
+                if (!(charList[idx].StartsWith("<") && charList[idx].EndsWith(">")))
                 {
-                    sb.Append(part.Text);
+                    visibleCount++;
+                    if (visibleCount >= targetWindowChars)
+                        break;
+                }
+            }
+        
+            var activeTagStack = new Stack<(string tagName, string fullTag)>();
+            for (int i = 0; i < startIndex; i++)
+            {
+                string item = charList[i];
+                if (item.StartsWith("<") && item.EndsWith(">"))
+                {
+                    if (!item.StartsWith("</"))
+                    {
+                        string tagName = ExtractTagName(item);
+                        activeTagStack.Push((tagName, item));
+                    }
+                    else
+                    {
+                        string tagName = ExtractTagName(item);
+                        var temp = new Stack<(string, string)>();
+                        bool found = false;
+                        while (activeTagStack.Count > 0)
+                        {
+                            var top = activeTagStack.Pop();
+                            if (top.tagName == tagName && !found)
+                            {
+                                found = true;
+                                break;
+                            }
+                            temp.Push(top);
+                        }
+                        while (temp.Count > 0)
+                            activeTagStack.Push(temp.Pop());
+                    }
+                }
+            }
+        
+            bool hasColorTag = charList.Any(c => c.StartsWith("<color=") || c.StartsWith("<color "));
+            bool insideColorAtStart = activeTagStack.Any(t => t.tagName == "color");
+        
+            var sb = new StringBuilder();
+            sb.Append(prefix);
+        
+            if (!insideColorAtStart) sb.Append("<color=#ffffff>");
+        
+            var openTags = new Stack<string>();
+            if (!insideColorAtStart)
+                openTags.Push("color");
+        
+            var activeTagsList = activeTagStack.ToList();
+            activeTagsList.Reverse();
+            foreach (var tag in activeTagsList)
+            {
+                sb.Append(tag.fullTag);
+                openTags.Push(tag.tagName);
+            }
+        
+            for (int i = 0; i < windowSize; i++)
+            {
+                int idx = (startIndex + i) % totalChars;
+                string item = charList[idx];
+        
+                if (item.StartsWith("<") && item.EndsWith(">"))
+                {
+                    if (!item.StartsWith("</"))
+                    {
+                        string tagName = ExtractTagName(item);
+                        sb.Append(item);
+                        openTags.Push(tagName);
+                    }
+                    else
+                    {
+                        string tagName = ExtractTagName(item);
+                        sb.Append(item);
+        
+                        if (tagName == "color")
+                        {
+                            sb.Append("<color=#ffffff>");
+                            openTags.Push("color");
+                        }
+        
+                        var temp = new Stack<string>();
+                        bool found = false;
+                        while (openTags.Count > 0)
+                        {
+                            var top = openTags.Pop();
+                            if (top == tagName && !found)
+                            {
+                                found = true;
+                                break;
+                            }
+                            temp.Push(top);
+                        }
+                        while (temp.Count > 0)
+                            openTags.Push(temp.Pop());
+                    }
                 }
                 else
                 {
-                    string text = part.Text;
-                    int partLength = text.Length;
-
-                    for (int j = 0; j < partLength; j++)
-                    {
-                        int charIndex = (j + visibleSoFar + startIndex) % partLength;
-                        sb.Append(text[charIndex]);
-                    }
-
-                    visibleSoFar += partLength;
+                    sb.Append(item);
                 }
             }
-
+        
+            if (!openTags.Contains("color"))
+            {
+                sb.Append("<color=#ffffff>");
+                openTags.Push("color");
+            }
+        
+            while (openTags.Count > 0)
+            {
+                string tagName = openTags.Pop();
+                sb.Append($"</{tagName}>");
+            }
+        
             textMeshPro.SetTextSafe(sb.ToString());
-        }
+}
 
         internal void LetterByLetterAnimation(TextMeshProUGUI textMeshPro, string originalText)
         {
@@ -677,6 +795,7 @@ namespace FewTags.FewTags
                 prefix = "[L] ";
                 textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
             }
+
 
             glitchTimer += Time.unscaledDeltaTime * GLITCH_SPEED;
             
