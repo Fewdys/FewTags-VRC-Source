@@ -6,8 +6,8 @@
 </p>
 
 # Outside Of Local Tagging, Animated Tags Are Not Free. Normal Ones However Are
-### Animated Tags Will Be $4 Per Animated When I Figure Out What Way I Want Payment
-### Developers *May* or *May Not* Recieve Animated Tags For Free
+#### Animated Tags Will Be $4 Per Animated When I Figure Out What Way I Want Payment
+#### Developers *May* or *May Not* Recieve Animated Tags For Free
 
 ## Example Of How Local Tags Text File Should Look
 ```
