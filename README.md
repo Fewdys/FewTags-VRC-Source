@@ -9,7 +9,7 @@
 #### Animated Tags Will Be $4 Per Animated (Crypto or Paypal)
 ##### For Payment Please Either DM Me Directly On Discord @Fewdys or Join The Discord Server & Make A Ticket
 #### Developers *May* or *May Not* Recieve Animated Tags For Free
-##### ![Discord Server Link](https://discord.gg/4mf3kwkvGf)
+##### [Discord Server Link](https://discord.gg/4mf3kwkvGf)
 
 ## Example Of How Local Tags Text File Should Look
 ```
