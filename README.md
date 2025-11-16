@@ -32,7 +32,7 @@ Example 5: Use Of Rainbow Animated Tag and Blink Animated Tag
 
 ## List Of Animated Tags:
 ```
-Scroll: Scrolls Text To The Left On Loop
+Scroll: Scrolls Text To The Left On Loop (Supports Coloring)
 CYLN: Bounces A Red Line Across Text Back And Forth (Supports One Color For Coloring)
 LBL (Letter By Letter): Removes Letters/Characters One By One Than Adds Them Back One By One (No Support For Coloring)
 RAIN (Rainbow): Old Call Of Duty World At War Modded Clan Tag Like Rainbow (No Support For Coloring)
