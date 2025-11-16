@@ -1,5 +1,3 @@
-# FewTags-VRC-Source
-
 ## Example Gif Of FewTags
 <p align="center">
   <img src="https://github.com/Fewdys/FewTags-VRC-Source/blob/main/FewTags%20Example.gif" width="400" height="225">
