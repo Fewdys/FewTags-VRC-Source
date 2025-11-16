@@ -6,7 +6,7 @@
 </p>
 
 # Outside Of Local Tagging, Animated Tags Are Not Free. Normal Ones However Are
-#### Animated Tags Will Be $4 Per Animated (Crypto or Paypal)
+#### Animated Tags Will Be $4 Per Animated (Crypto or Paypal Friends & Family)
 ##### For Payment Please Either DM Me Directly On Discord @Fewdys or Join The Discord Server & Make A Ticket
 #### Developers *May* or *May Not* Recieve Animated Tags For Free
 ##### [Discord Server Link](https://discord.gg/4mf3kwkvGf)
