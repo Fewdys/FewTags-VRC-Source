@@ -1,0 +1,6 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/FewTags-Rewrite V2/.vs/FewTags-Rewrite V2
+/FewTags-Rewrite V2/obj
