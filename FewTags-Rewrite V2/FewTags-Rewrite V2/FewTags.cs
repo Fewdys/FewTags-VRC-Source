@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace FewTags.FewTags
+﻿namespace FewTags.FewTags
 {
     /// <summary>
     /// This Is Pretty Much Just References Used In Other Classes Where Need Be Nowadays -> Consider Looking At Loader.cs
@@ -9,7 +7,7 @@ namespace FewTags.FewTags
     public class FewTags
     {
         internal static int MaxPlatesPerUser, MaxNewlinesPerPlate, MaxPlateSize, FallbackSize, MaxTagLength, UpdateIntervalMinutes;
-        internal static bool CleanseTags, ReplaceInsteadOfSkip, BeepOnReuploaderDetected, EnableAnimations, isOverlay, DisableBigPlates, NoHTMLForMain, FewTagsEnabled, LimitNewLineOrLength;
+        internal static bool CleanseTags, ReplaceInsteadOfSkip, BeepOnReuploaderDetected, EnableAnimations, isOverlay, DisableBigPlates, NoHTMLForMain, FewTagsEnabled, LimitNewLineOrLength, UnderNameplate;
         internal static HashSet<string> BlacklistedUserIDs = new HashSet<string>();
 
         internal const float Position = -126.95f, PositionTags = -154.95f, PositionID = -98.95f, PositionBigText = 344.75f;

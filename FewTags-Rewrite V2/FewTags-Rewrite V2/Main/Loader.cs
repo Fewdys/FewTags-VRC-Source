@@ -34,6 +34,7 @@ namespace FewTags.FewTags
             //harmony = new Harmony(PluginInfo.PLUGIN_GUID);
 
             ClassInjector.RegisterTypeInIl2Cpp<TagAnimator>();
+            ClassInjector.RegisterTypeInIl2Cpp<MenuDetector>();
 
             OnPlayer.PatchOnPlayer();
             FewTagsConfigLoader.Load();
@@ -57,6 +58,7 @@ namespace FewTags.FewTags
             // ^ Used To Be OnApplicationLateStart() ^ //
             //new WaitForSeconds(3f);
             ClassInjector.RegisterTypeInIl2Cpp<TagAnimator>();
+            ClassInjector.RegisterTypeInIl2Cpp<MenuDetector>();
 
             OnPlayer.PatchOnPlayer();
             FewTagsConfigLoader.Load();

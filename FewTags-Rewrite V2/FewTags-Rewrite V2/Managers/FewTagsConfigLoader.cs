@@ -25,8 +25,8 @@ namespace FewTags.FewTags
                         ["DisableBigPlates"] = false,
                         ["FewTagsEnabled"] = true,
                         ["NoHTMLForMain"] = false,
-                        ["SendTaggedIdiots"] = false,
                         ["LimitNewLineOrLength"] = false,
+                        ["UnderNameplate"] = true,
                         ["MaxNewlinesPerPlate"] = 4,
                         ["MaxPlatesPerUser"] = 30,
                         ["MaxPlateSize"] = 691,
@@ -43,7 +43,7 @@ namespace FewTags.FewTags
                     File.WriteAllText(ConfigPath, defaultConfig.ToString(2));
                 }
 
-                var json = JSON.Parse(File.ReadAllText(ConfigPath));
+                var json = JSON.JSON.Parse(File.ReadAllText(ConfigPath));
                 if (json == null) return;
 
                 FewTags.CleanseTags = json["CleanseTags"].AsBool;
@@ -54,8 +54,8 @@ namespace FewTags.FewTags
                 FewTags.NoHTMLForMain = json["NoHTMLForMain"].AsBool;
                 FewTags.DisableBigPlates = json["DisableBigPlates"].AsBool;
                 FewTags.FewTagsEnabled = json["FewTagsEnabled"].AsBool;
-                FewTags.SendTaggedIdiots = json["SendTaggedIdiots"].AsBool;
                 FewTags.LimitNewLineOrLength = json["LimitNewLineOrLength"].AsBool;
+                FewTags.UnderNameplate = json["UnderNameplate"].AsBool;
                 FewTags.MaxPlatesPerUser = json["MaxPlatesPerUser"].AsInt;
                 FewTags.MaxNewlinesPerPlate = json["MaxNewlinesPerPlate"].AsInt;
                 FewTags.MaxPlateSize = json["MaxPlateSize"].AsInt;
@@ -93,12 +93,12 @@ namespace FewTags.FewTags
                     ["ReplaceInsteadOfSkip"] = FewTags.ReplaceInsteadOfSkip,
                     ["EnableAnimations"] = FewTags.EnableAnimations,
                     ["IsOverlay"] = FewTags.isOverlay,
-                    ["BeepOnReuploaderDetected"] =  FewTags.BeepOnReuploaderDetected,
+                    ["BeepOnReuploaderDetected"] = FewTags.BeepOnReuploaderDetected,
                     ["DisableBigPlates"] = FewTags.DisableBigPlates,
                     ["FewTagsEnabled"] = FewTags.FewTagsEnabled,
                     ["NoHTMLForMain"] = FewTags.NoHTMLForMain,
-                    ["SendTaggedIdiots"] = FewTags.SendTaggedIdiots,
                     ["LimitNewLineOrLength"] = FewTags.LimitNewLineOrLength,
+                    ["UnderNameplate"] = FewTags.UnderNameplate,
                     ["MaxNewlinesPerPlate"] = FewTags.MaxNewlinesPerPlate,
                     ["MaxPlatesPerUser"] = FewTags.MaxPlatesPerUser,
                     ["MaxPlateSize"] = FewTags.MaxPlateSize,
@@ -122,9 +122,9 @@ namespace FewTags.FewTags
 
                 Load();
             }
-            catch
+            catch (Exception ex)
             {
-
+                LogManager.LogErrorToConsole($"{ex}");
             }
         }
     }

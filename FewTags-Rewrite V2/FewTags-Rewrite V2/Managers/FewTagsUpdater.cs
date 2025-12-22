@@ -1,10 +1,8 @@
 ﻿using FewTags.FewTags.JSON;
 using FewTags.FewTags.Wrappers;
 using Il2CppSystem;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Net;
+using TMPro;
 using UnityEngine;
 
 namespace FewTags.FewTags
@@ -103,7 +101,7 @@ namespace FewTags.FewTags
 
                     using (WebClient wc = new WebClient())
                     {
-                        FewTags.s_rawTags = wc.DownloadString(url); // do FewTags.url instead (current url is set for my local thingy)
+                        FewTags.s_rawTags = wc.DownloadString(url);
 
                         if (string.IsNullOrEmpty(FewTags.s_rawTags))
                         {
@@ -210,7 +208,7 @@ namespace FewTags.FewTags
             if (changed || bigChanged)
             {
                 ///
-                /// These Two Log Messages Are For Debugging You Can Comment Them Out
+                /// These Two Log Messages Are For Debugging You Can Comment Them Out!!
                 /// 
                 LogManager.LogWarningToConsole($"Tags changed for {uid}: prev=[{string.Join(",", prevTags ?? System.Array.Empty<string>())}], curr=[{string.Join(",", currentTags ?? System.Array.Empty<string>())}]");
                 LogManager.LogWarningToConsole($"BigPlate changed for {uid}: prev=[{prevBig ?? "null"}], curr=[{bigPlate ?? "null"}]");

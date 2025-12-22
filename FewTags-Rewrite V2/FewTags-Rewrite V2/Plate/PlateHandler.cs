@@ -1,8 +1,4 @@
-﻿using FewTags.FewTags.JSON;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace FewTags.FewTags
 {
@@ -173,7 +169,27 @@ namespace FewTags.FewTags
                 if (founduser.Tag.Length == 0 && !hasLocalTags)
                     return;
 
+                bool hasBigPlate = !FewTags.DisableBigPlates && founduser.BigTextActive;
                 int tagCount = Math.Min(currentTags.Count, FewTags.MaxPlatesPerUser);
+                float baseY = FewTags.UnderNameplate ? FewTags.PositionTags : !FewTags.UnderNameplate && VRCPlayer.field_Internal_Static_VRCPlayer_0 != null && vrcPlayer == VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_Player_0 ? 139.05f : 119.05f; // 28 will move the plate up once, so if you have nameplate stats e.g add 28 as needed to 139.05f
+                const float spacing = 28f;
+                const float bigPlateOffset = 500f;
+
+                var movingElements = new List<Transform>();
+
+                if (!FewTags.UnderNameplate)
+                {
+                    if (hasBigPlate) movingElements.Add(_platestatic._gameObjectBP.transform);
+                    movingElements.Add(_platestatic._gameObjectID.transform);
+                    movingElements.Add(_platestatic._gameObjectM.transform);
+
+                    if (hasBigPlate)
+                        _platestatic.UpdatePosition(baseY + bigPlateOffset, false, true, false);
+
+                    _platestatic.UpdatePosition(baseY + spacing, false, false, true);
+                    _platestatic.UpdatePosition(baseY, true, false, false);
+                }
+
                 var platesForUser = new List<Plate>();
 
                 for (int i = 0; i < tagCount; i++)
@@ -216,7 +232,14 @@ namespace FewTags.FewTags
                         if (isTooLong || hasTooManyLines) continue; // skip tag -- disable
                     }
 
-                    Plate plate = new Plate(vrcPlayer, FewTags.PositionTags - (i * 28f), tag);
+                    if (!FewTags.UnderNameplate)
+                    {
+                        foreach (var t in movingElements)
+                            t.localPosition += new Vector3(0f, spacing, 0f);
+                    }
+
+                    float plateY = FewTags.UnderNameplate ? baseY - (i * spacing) : baseY;
+                    Plate plate = new Plate(vrcPlayer, plateY, tag);
                     var plateText = plate.Text;
                     plateText?.SetTextSafe(tag);
                     plateText?.SetOverlay();
@@ -238,6 +261,7 @@ namespace FewTags.FewTags
                     }
 
                     platesForUser.Add(plate);
+                    movingElements.Add(plate._gameObject.transform);
                 }
 
                 FewTags.playerPlates[uid] = platesForUser;
@@ -248,6 +272,15 @@ namespace FewTags.FewTags
                     FewTags.p.Add(vrcPlayer);
                 }
                 PlateFunctions.NameplateESP(vrcPlayer);
+
+                if (!FewTags.UnderNameplate)
+                {
+                    foreach (var plate in movingElements)
+                    {
+                        var detect = plate.gameObject.AddComponent<MenuDetector>();
+                        detect.player = vrcPlayer;
+                    }
+                }
             }
             catch (Exception ex)
             {

@@ -74,7 +74,9 @@ namespace FewTags.FewTags
                 return;
             }
 
-            var slice = obj_t?.GetComponent<ImageThreeSlice>();
+            // UNCOMMENT IF YOU WANT - Be Sure To Add Color Logic If You Do
+
+            /*var slice = obj_t?.GetComponent<ImageThreeSlice>();
             if (slice != null)
             {
                 slice.color = GetColor.GetPlayerColor(__0);
@@ -84,7 +86,7 @@ namespace FewTags.FewTags
                 LogManager.LogErrorToConsole("ImageThreeSlice missing on plate.");
                 Cleanup();
                 return;
-            }
+            }*/
 
             Text = obj_t?.Find("Trust Text").GetComponent<TextMeshProUGUI>();
             if (Text == null)
@@ -149,7 +151,16 @@ namespace FewTags.FewTags
             TextID = null;
         }
 
-
+        public void UpdatePosition(float position, bool mainobj = false, bool bigplate = false, bool idplate = false)
+        {
+            var vecPos = new Vector3(0, position, 0);
+            if (mainobj && _gameObjectM != null)
+                _gameObjectM.transform.localPosition = vecPos;
+            if (bigplate && _gameObjectBP != null)
+                _gameObjectBP.transform.localPosition = vecPos;
+            if (idplate && _gameObjectID != null)
+                _gameObjectID.transform.localPosition = vecPos;
+        }
 
         public PlateStatic(VRC.Player __0)
         {
@@ -196,11 +207,12 @@ namespace FewTags.FewTags
                 }
             }
             Utils.DestroyChildren(_gameObjectID);
-            try
+            // UNCOMMENT IF YOU WANT - Be Sure To Add Color Logic If You Do
+            /*try
             {
                 ID_obj_t.GetComponent<ImageThreeSlice>().color = GetColor.GetPlayerColor(__0);
             }
-            catch { }
+            catch { }*/
             ID_obj_t.localPosition = new Vector3(0, FewTags.PositionID, 0);
             _gameObjectID.SetActive(true);
             TextID.SetTextSafe("");
@@ -244,11 +256,12 @@ namespace FewTags.FewTags
                 }
             }
             Utils.DestroyChildren(_gameObjectM);
-            try
+            // UNCOMMENT IF YOU WANT - Be Sure To Add Color Logic If You Do
+            /*try
             {
                 M_obj_t.GetComponent<ImageThreeSlice>().color = GetColor.GetPlayerColor(__0);
             }
-            catch { }
+            catch { }*/
             M_obj_t.localPosition = new Vector3(0, FewTags.Position, 0);
             _gameObjectM.SetActive(true);
             TextM.SetTextSafe("");
@@ -292,11 +305,12 @@ namespace FewTags.FewTags
                 }
             }
             Utils.DestroyChildren(_gameObjectBP);
-            try
+            // UNCOMMENT IF YOU WANT - Be Sure To Add Color Logic If You Do
+            /*try
             {
                 BP_obj_t.GetComponent<ImageThreeSlice>().color = GetColor.GetPlayerColor(__0);
             }
-            catch { }
+            catch { }*/
             BP_obj_t.localPosition = new Vector3(0, FewTags.PositionBigText, 0);
             BP_obj_t.GetComponent<ImageThreeSlice>().enabled = false;
             _gameObjectBP.SetActive(true);
