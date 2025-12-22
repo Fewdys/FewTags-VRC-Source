@@ -174,7 +174,7 @@ namespace FewTags.FewTags
                 float baseY = FewTags.PositionTags;
                 if (VRC.Player.prop_Player_0 != null && VRC.Player.prop_Player_0 == vrcPlayer && !FewTags.UnderNameplate)
                 {
-                    baseY = 196.05f;
+                    baseY = 147.05f; // Add + 28 if needed
                 }
                 ///
                 /// ONLY NEEDED IF YOU DO SOME SPECIAL NAMEPLATE THAT IS SELF / FRIEND RELATED
