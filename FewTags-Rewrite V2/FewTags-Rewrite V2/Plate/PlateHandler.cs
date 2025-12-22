@@ -171,7 +171,21 @@ namespace FewTags.FewTags
 
                 bool hasBigPlate = !FewTags.DisableBigPlates && founduser.BigTextActive;
                 int tagCount = Math.Min(currentTags.Count, FewTags.MaxPlatesPerUser);
-                float baseY = FewTags.UnderNameplate ? FewTags.PositionTags : !FewTags.UnderNameplate && VRCPlayer.field_Internal_Static_VRCPlayer_0 != null && vrcPlayer == VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_Player_0 ? 139.05f : 119.05f; // 28 will move the plate up once, so if you have nameplate stats e.g add 28 as needed to 139.05f
+                float baseY = FewTags.PositionTags;
+                if (VRC.Player.prop_Player_0 != null && VRC.Player.prop_Player_0 == vrcPlayer && !FewTags.UnderNameplate)
+                {
+                    baseY = 196.05f;
+                }
+                ///
+                /// ONLY NEEDED IF YOU DO SOME SPECIAL NAMEPLATE THAT IS SELF / FRIEND RELATED
+                /// 
+                /*else if (vrcPlayer.APIUser != null && vrcPlayer.APIUser.isFriend && !FewTags.UnderNameplate) // or whatever other friend checking logic
+                    baseY = 147.05f;*/
+                ///
+                /// END
+                /// 
+                else if (!FewTags.UnderNameplate)
+                    baseY = 119.05f; // default pos above nameplates feel free to add 28 as many times as needed for however many custom plates you have and or modify MenuUpdator to handle it
                 const float spacing = 28f;
                 const float bigPlateOffset = 500f;
 
