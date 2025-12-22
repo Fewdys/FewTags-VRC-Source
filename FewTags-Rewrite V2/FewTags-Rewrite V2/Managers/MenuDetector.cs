@@ -21,6 +21,8 @@ namespace FewTags.FewTags
 
         void Update()
         {
+            if (FewTags.UnderNameplate) return;
+
             if (qm == null)
                 qm = GameObject.Find("Canvas_QuickMenu(Clone)");
 
