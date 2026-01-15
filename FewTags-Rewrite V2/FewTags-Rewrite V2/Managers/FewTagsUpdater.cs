@@ -225,8 +225,9 @@ namespace FewTags.FewTags
         /// </summary>
         internal static void UpdateAllPlayersTagsLive()
         {
-            var allPlayers = PlayerWrapper.GetAllPlayers();
-            for (int i = 0; i < allPlayers.Count; i++)
+            var allPlayers = Utils.AllPlayers;
+            if (allPlayers == null || allPlayers.Length == 0) return;
+            for (int i = 0; i < allPlayers.Length; i++)
             {
                 var player = allPlayers[i];
                 if (player == null) continue;

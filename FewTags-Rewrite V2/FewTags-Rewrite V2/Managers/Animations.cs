@@ -23,9 +23,6 @@ namespace FewTags.FewTags
         public float ScrollSpeed = 8f;
         private float scrollOffset = 0f;
 
-        private float lastRealTime;
-        private float delta;
-
         private List<TextPart> cachedParts = null;
         private string cachedOriginalText = "";
         private int cachedVisibleLength = -1;
@@ -388,9 +385,9 @@ namespace FewTags.FewTags
                 string tagName = openTags.Pop();
                 sb.Append($"</{tagName}>");
             }
-        
-            textMeshPro.SetTextSafe(sb.ToString());
-}
+
+            textMeshPro.SetTextSafe(sb.ToString(), true, true);
+        }
 
         internal void LetterByLetterAnimation(TextMeshProUGUI textMeshPro, string originalText)
         {

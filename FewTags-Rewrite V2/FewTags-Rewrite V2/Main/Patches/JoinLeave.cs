@@ -26,6 +26,7 @@ namespace FewTags.FewTags.Patches
             if (localPlayer == null) return;
             if (localPlayer.prop_APIUser_0 == null) return;
 
+            Utils.GetAllPlayers(); // might be redundant to call this here, but it's better than having it be called every frame as it's not needed every frame
             JoinLeaveManager.DoBasicJoinCheck(__0);
 
             return;
@@ -35,6 +36,7 @@ namespace FewTags.FewTags.Patches
         {
             if (__0.prop_APIUser_0 == null) return;
 
+            Utils.GetAllPlayers();
             JoinLeaveManager.DoBasicLeaveCheck(__0);
 
             return;

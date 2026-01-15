@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FewTags.FewTags.Wrappers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -6,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using VRC.SDKBase;
 
 namespace FewTags.FewTags
 {
@@ -17,6 +19,7 @@ namespace FewTags.FewTags
         private static readonly object _beepLock = new();
         private static Queue<(int frequency, int duration)> _patternQueue;
         private static Timer _timer;
+        public static VRC.Player[] AllPlayers;
 
         public static void Beep(int frequency, int duration)
         {
@@ -33,6 +36,13 @@ namespace FewTags.FewTags
                     PlayPattern();
                 }
             });
+        }
+
+        public static void GetAllPlayers()
+        {
+            var players = PlayerWrapper.GetAllVRCPlayers();
+            if (players == null) return;
+            AllPlayers = players.ToArray();
         }
 
         public static void AmongUsBeepAlt()
@@ -115,22 +125,28 @@ namespace FewTags.FewTags
         /// Safely sets the text of a TextMeshPro or TextMeshProUGUI object.
         /// Can be called directly on a TMP_Text instance.
         /// </summary>
-        public static void SetTextSafe(this TMP_Text tmp, string text)
+        public static void SetTextSafe(this TMP_Text tmp, string text, bool RequireRebuild = false, bool Overflow = false)
         {
             if (tmp == null) return;
             tmp.text = text ?? string.Empty;
+            if (Overflow && tmp.overflowMode != TextOverflowModes.Overflow) tmp.overflowMode = TextOverflowModes.Overflow;
+            if (RequireRebuild) tmp.ForceMeshUpdate(true, true); // hopefully fixes issue with MelonLoader
         }
 
         /// <summary>
         /// Safely sets the text on a GameObject by finding a TMP_Text component on it.
         /// </summary>
-        public static void SetTextSafe(this GameObject go, string text)
+        public static void SetTextSafe(this GameObject go, string text, bool RequireRebuild = false, bool Overflow = false)
         {
             if (go == null) return;
 
             var tmp = go.GetComponent<TMP_Text>();
             if (tmp != null)
+            {
                 tmp.text = text ?? string.Empty;
+                if (Overflow && tmp.overflowMode != TextOverflowModes.Overflow) tmp.overflowMode = TextOverflowModes.Overflow;
+                if (RequireRebuild) tmp.ForceMeshUpdate(true, true); // hopefully fixes issue with MelonLoader
+            }
         }
 
         /// <summary>
@@ -164,7 +180,7 @@ namespace FewTags.FewTags
         /// <summary>
         /// Adds a local tag prefix to the specified text, inserting it after a recognized animation marker if present.
         /// </summary>
-        /// <remarks>If the text contains a recognized animation marker (such as ".LBL." or ".CYLN."), the
+        /// <remarks>If the text contains a recognized animation marker (such as ".LBL." or ".CYLN." for example), the
         /// local tag prefix "[L] " is inserted immediately after the first occurrence of such a marker. Otherwise, the
         /// prefix is added at the beginning of the text.</remarks>
         /// <param name="text">The text to which the local tag prefix will be added. Can be null or empty.</param>

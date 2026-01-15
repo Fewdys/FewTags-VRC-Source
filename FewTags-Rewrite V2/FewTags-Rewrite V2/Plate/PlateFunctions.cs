@@ -93,8 +93,9 @@ namespace FewTags.FewTags
         {
             if (FewTags.p.Count != 0)
             {
-                var allPlayers = VRCPlayerApi.AllPlayers;
-                for (int i = 0; i < allPlayers.Count; i++)
+                var allPlayers = Utils.AllPlayers; // or assign whatever you're playerlist is
+                if (allPlayers == null || allPlayers.Length == 0) return;
+                for (int i = 0; i < allPlayers.Length; i++)
                 {
                     var user = allPlayers[i];
                     VRC.Player player = user?.gameObject?.GetComponent<VRC.Player>();
@@ -122,6 +123,7 @@ namespace FewTags.FewTags
             if (nameplate == null) return;
 
             var transforms = nameplate.GetComponentsInChildren<Transform>(true);
+            if (transforms == null || transforms.Length == 0) return;
             for (int i = 0; i < transforms.Length; i++)
             {
                 var t = transforms[i];
@@ -192,8 +194,10 @@ namespace FewTags.FewTags
                 LogManager.LogWarningToConsole($"Nameplate Overlay Was {(FewTags.isOverlay ? "Enabled" : "Disabled")}");
                 if (FewTags.p.Count != 0)
                 {
-                    var allPlayers = PlayerWrapper.GetAllPlayers();
-                    for (int i = 0; i < allPlayers.Count; i++)
+                    var allPlayers = Utils.AllPlayers; // or assign whatever you're playerlist is
+                    if (allPlayers == null || allPlayers.Length == 0) return;
+
+                    for (int i = 0; i < allPlayers.Length; i++)
                     {
                         var user = allPlayers[i];
                         VRC.Player player = user?.gameObject?.GetComponent<VRC.Player>();
