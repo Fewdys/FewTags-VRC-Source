@@ -22,15 +22,15 @@ namespace FewTags.FewTags
         internal static void WorldChangeCall()
         {
             Utils.ClearGeneratedIDValues();
-            //ClearAllPlates(); // this is not needed and calling so could cause issues, this is pretty much already handled by unity itself
+            ClearAllPlates();
         }
 
         /// <summary>
         /// Clears or Removes All Plates From All Players That Have Plates.
         /// </summary>
-        internal static void ClearAllPlates()
+        internal static void ClearAllPlates() // commented out code can cause issues depening on you're loader / build feel free to leave commented or try with uncommented (in reality shouldn't make a difference)
         {
-            var keys1 = FewTags.playerPlates.Keys.ToArray();
+            /*var keys1 = FewTags.playerPlates.Keys.ToArray();
             for (int i = 0; i < keys1.Length; i++)
             {
                 var key = keys1[i];
@@ -39,10 +39,10 @@ namespace FewTags.FewTags
                 {
                     plates[j]?.Cleanup();
                 }
-            }
+            }*/
             FewTags.playerPlates.Clear();
 
-            var keys2 = FewTags.playerStaticPlates.Keys.ToArray();
+            /*var keys2 = FewTags.playerStaticPlates.Keys.ToArray();
             for (int i = 0; i < keys2.Length; i++)
             {
                 var key = keys2[i];
@@ -51,7 +51,7 @@ namespace FewTags.FewTags
                 {
                     plates[j]?.Cleanup();
                 }
-            }
+            }*/
             FewTags.playerStaticPlates.Clear();
         }
 

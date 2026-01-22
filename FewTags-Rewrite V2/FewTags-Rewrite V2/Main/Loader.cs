@@ -43,6 +43,7 @@ namespace FewTags.FewTags
             // add you're logic
 
             //FewTagsUpdater.DoUpdate(); // add this to either to the update of a monobehaviour or you're OnUpdate loop
+            //PlateFunctions.WorldChangeCall(); // add this to scene change method call as needed
 
             Log.LogInfo("FewTags Loaded!");
             Log.LogInfo("Tagged Players - Nameplate ESP On/Off: RightShift + O");
@@ -66,6 +67,7 @@ namespace FewTags.FewTags
             LocalTags.LoadLocalTags();
 
             //FewTagsUpdater.DoUpdate(); // add this to either to the update of a monobehaviour or you're OnUpdate loop
+            //PlateFunctions.WorldChangeCall(); // add this to scene change method call as needed
 
             LogManager.LogToConsole(ConsoleColor.Green, "FewTags Loaded!");
             LogManager.LogToConsole(ConsoleColor.Green, "Tagged Players - Nameplate ESP On/Off: RightShift + O");
