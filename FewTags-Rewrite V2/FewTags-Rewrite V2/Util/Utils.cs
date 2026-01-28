@@ -15,7 +15,7 @@ namespace FewTags.FewTags
     {
         internal static System.Random random = new System.Random();
         internal static readonly HashSet<int> usedNegativeIds = new HashSet<int>();
-        public static List<string> ObjectsToDestroy = new List<string> { "Trust Icon", "Performance Icon", "Performance Text", "Friend Anchor Stats", "Reason" };
+        public static List<string> ObjectsToDestroy = new List<string> { "Trust Icon", "Performance Icon", "Performance Text", "Friend Anchor Stats", "Reason", "Shared Connections Icon", "Shared Connections Text" };
         private static readonly object _beepLock = new();
         private static Queue<(int frequency, int duration)> _patternQueue;
         private static Timer _timer;
