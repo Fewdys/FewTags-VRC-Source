@@ -76,6 +76,34 @@ namespace FewTags.FewTags
             return tmp.text;
         }
 
+        public static Color GetBackgroundColor(this GameObject obj)
+        {
+            if (obj == null) return Color.white;
+            var imagethreeslice = obj.GetComponentInChildren<ImageThreeSlice>();
+            if (imagethreeslice != null) return imagethreeslice.color;
+            return Color.white;
+        }
+
+        public static Color GetMainPlateColor(this PlayerNameplate nameplate)
+        {
+            if (nameplate == null) return Color.white;
+
+            return nameplate.field_Public_Color_0;
+        }
+
+        public static Color GetMainPlateColorByImageThreeSlice(this PlayerNameplate nameplate)
+        {
+            if (nameplate == null) return Color.white;
+            var background = nameplate.mainContainer?.transform.Find("Background");
+            if (background != null)
+            {
+                var imagethreeslice = background.GetComponent<ImageThreeSlice>();
+                if (imagethreeslice != null) return imagethreeslice.color;
+            }
+
+            return Color.white;
+        }
+
         /// <summary>
         /// Gets an existing TagAnimator component or adds a new one to the specified PlateStatic object, targeting the
         /// big plate, ID plate, or malicious plate GameObject based on the provided flags.

@@ -46,7 +46,7 @@ namespace FewTags.FewTags
             ///
             /// ASSIGN COLOR HERE
             ///
-            var color = Color.white; // white is a placeholder!
+            var color = plateBase.GetMainPlateColorByImageThreeSlice(); // white is a placeholder!
             ///
             /// END
             ///
@@ -162,7 +162,8 @@ namespace FewTags.FewTags
         public PlateStatic(VRC.Player __0)
         {
 
-            if (__0?._vrcplayer?.Nameplate?.quickStats == null || __0._vrcplayer.Nameplate.contents == null)
+            var plateBase = __0?._vrcplayer?.Nameplate;
+            if (plateBase?.quickStats == null || plateBase?.contents == null)
             {
                 LogManager.LogErrorToConsole("Required nameplate components are null.");
                 return;
@@ -171,7 +172,7 @@ namespace FewTags.FewTags
             ///
             /// ASSIGN COLOR HERE
             ///
-            var color = Color.white; // white is a placeholder!
+            var color = plateBase.GetMainPlateColorByImageThreeSlice(); // white is a placeholder!
             ///
             /// END
             ///
