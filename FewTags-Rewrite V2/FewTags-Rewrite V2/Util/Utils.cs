@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using FewTags.FewTags.Wrappers;
 using TMPro;
 using UnityEngine;
 
@@ -29,6 +30,13 @@ namespace FewTags.FewTags
             }
 
             tmp.color = color;
+        }
+
+        public static void GetAllPlayers()
+        {
+            var players = PlayerWrapper.GetAllVRCPlayers();
+            if (players == null) return;
+            AllPlayers = players.ToArray();
         }
 
         /// <summary>
