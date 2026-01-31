@@ -20,7 +20,6 @@ namespace FewTags.FewTags
             Text = null;
         }
 
-
         public Plate(VRC.Player __0, float position, string tag)
         {
             if (__0 == null) return;
@@ -43,6 +42,14 @@ namespace FewTags.FewTags
                 LogManager.LogErrorToConsole("contents is null.");
                 return;
             }
+
+            ///
+            /// ASSIGN COLOR HERE
+            ///
+            var color = Color.white; // white is a placeholder!
+            ///
+            /// END
+            ///
 
             _gameObject = GameObject.Instantiate(plateBase.quickStats, plateBase.contents.transform).gameObject;
 
@@ -74,21 +81,9 @@ namespace FewTags.FewTags
                 return;
             }
 
-            // UNCOMMENT IF YOU WANT - Be Sure To Add Color Logic If You Do
+            obj_t.ColorPlate(color);
 
-            /*var slice = obj_t?.GetComponent<ImageThreeSlice>();
-            if (slice != null)
-            {
-                slice.color = GetColor.GetPlayerColor(__0);
-            }
-            else
-            {
-                LogManager.LogErrorToConsole("ImageThreeSlice missing on plate.");
-                Cleanup();
-                return;
-            }*/
-
-            Text = obj_t?.Find("Trust Text").GetComponent<TextMeshProUGUI>();
+            Text = obj_t.Find("Trust Text").GetComponent<TextMeshProUGUI>();
             if (Text == null)
             {
                 var trustText = Utils.RecursiveFindChild(obj_t, "Trust Text");
@@ -133,6 +128,8 @@ namespace FewTags.FewTags
         public GameObject? _gameObjectM { get; set; }
         public GameObject? _gameObjectID { get; set; }
 
+        public TagAnimator? Animator { get; set; }
+
         public void Cleanup()
         {
             if (_gameObjectBP != null && _gameObjectBP)
@@ -164,11 +161,20 @@ namespace FewTags.FewTags
 
         public PlateStatic(VRC.Player __0)
         {
+
             if (__0?._vrcplayer?.Nameplate?.quickStats == null || __0._vrcplayer.Nameplate.contents == null)
             {
                 LogManager.LogErrorToConsole("Required nameplate components are null.");
                 return;
             }
+
+            ///
+            /// ASSIGN COLOR HERE
+            ///
+            var color = Color.white; // white is a placeholder!
+            ///
+            /// END
+            ///
 
             // ID
             _gameObjectID = GameObject.Instantiate(__0._vrcplayer.Nameplate.quickStats, __0._vrcplayer.Nameplate.contents.transform).gameObject;
@@ -187,7 +193,7 @@ namespace FewTags.FewTags
                 return;
             }
 
-            TextID = ID_obj_t?.Find("Trust Text").GetComponent<TextMeshProUGUI>();
+            TextID = ID_obj_t.Find("Trust Text").GetComponent<TextMeshProUGUI>();
             if (TextID == null)
             {
                 var trustText = Utils.RecursiveFindChild(ID_obj_t, "Trust Text");
@@ -207,12 +213,7 @@ namespace FewTags.FewTags
                 }
             }
             Utils.DestroyChildren(_gameObjectID);
-            // UNCOMMENT IF YOU WANT - Be Sure To Add Color Logic If You Do
-            /*try
-            {
-                ID_obj_t.GetComponent<ImageThreeSlice>().color = GetColor.GetPlayerColor(__0);
-            }
-            catch { }*/
+            ID_obj_t.ColorPlate(color);
             ID_obj_t.localPosition = new Vector3(0, FewTags.PositionID, 0);
             _gameObjectID.SetActive(true);
             TextID.SetTextSafe("");
@@ -236,7 +237,7 @@ namespace FewTags.FewTags
                 return;
             }
 
-            TextM = M_obj_t?.Find("Trust Text").GetComponent<TextMeshProUGUI>();
+            TextM = M_obj_t.Find("Trust Text").GetComponent<TextMeshProUGUI>();
             if (TextM == null)
             {
                 var trustText = Utils.RecursiveFindChild(M_obj_t, "Trust Text");
@@ -256,12 +257,7 @@ namespace FewTags.FewTags
                 }
             }
             Utils.DestroyChildren(_gameObjectM);
-            // UNCOMMENT IF YOU WANT - Be Sure To Add Color Logic If You Do
-            /*try
-            {
-                M_obj_t.GetComponent<ImageThreeSlice>().color = GetColor.GetPlayerColor(__0);
-            }
-            catch { }*/
+            M_obj_t.ColorPlate(color);
             M_obj_t.localPosition = new Vector3(0, FewTags.Position, 0);
             _gameObjectM.SetActive(true);
             TextM.SetTextSafe("");
@@ -285,7 +281,7 @@ namespace FewTags.FewTags
                 return;
             }
 
-            TextBP = BP_obj_t?.Find("Trust Text").GetComponent<TextMeshProUGUI>();
+            TextBP = BP_obj_t.Find("Trust Text").GetComponent<TextMeshProUGUI>();
             if (TextBP == null)
             {
                 var trustText = Utils.RecursiveFindChild(BP_obj_t, "Trust Text");
@@ -305,12 +301,7 @@ namespace FewTags.FewTags
                 }
             }
             Utils.DestroyChildren(_gameObjectBP);
-            // UNCOMMENT IF YOU WANT - Be Sure To Add Color Logic If You Do
-            /*try
-            {
-                BP_obj_t.GetComponent<ImageThreeSlice>().color = GetColor.GetPlayerColor(__0);
-            }
-            catch { }*/
+            BP_obj_t.ColorPlate(color);
             BP_obj_t.localPosition = new Vector3(0, FewTags.PositionBigText, 0);
             BP_obj_t.GetComponent<ImageThreeSlice>().enabled = false;
             _gameObjectBP.SetActive(true);

@@ -4,7 +4,7 @@ namespace FewTags.FewTags
 {
     internal class FewTagsConfigLoader
     {
-        private static readonly string ConfigPath = Path.Combine("FewTags", "config.json");
+        internal static readonly string ConfigPath = Path.Combine("FewTags", "config.json");
 
         /// <summary>
         /// Loads The FewTags Config.
@@ -17,7 +17,9 @@ namespace FewTags.FewTags
                 {
                     var defaultConfig = new JSONObject
                     {
-                        ["CleanseTags"] = true,
+                        ["LimitSize"] = true,
+                        ["RemoveInvalidSpaceTags"] = true,
+                        ["RemoveAlphaTags"] = true,
                         ["ReplaceInsteadOfSkip"] = true,
                         ["EnableAnimations"] = true,
                         ["IsOverlay"] = false,
@@ -46,7 +48,9 @@ namespace FewTags.FewTags
                 var json = JSON.JSON.Parse(File.ReadAllText(ConfigPath));
                 if (json == null) return;
 
-                FewTags.CleanseTags = json["CleanseTags"].AsBool;
+                FewTags.LimitSize = json["LimitSize"].AsBool;
+                FewTags.RemoveInvalidSpaceTags = json["RemoveInvalidSpaceTags"].AsBool;
+                FewTags.RemoveAlphaTags = json["RemoveAlphaTags"].AsBool;
                 FewTags.ReplaceInsteadOfSkip = json["ReplaceInsteadOfSkip"].AsBool;
                 FewTags.EnableAnimations = json["EnableAnimations"].AsBool;
                 FewTags.isOverlay = json["IsOverlay"].AsBool;
@@ -89,7 +93,9 @@ namespace FewTags.FewTags
             {
                 var config = new JSONObject
                 {
-                    ["CleanseTags"] = FewTags.CleanseTags,
+                    ["LimitSize"] = FewTags.LimitSize,
+                    ["RemoveInvalidSpaceTags"] = FewTags.RemoveInvalidSpaceTags,
+                    ["RemoveAlphaTags"] = FewTags.RemoveAlphaTags,
                     ["ReplaceInsteadOfSkip"] = FewTags.ReplaceInsteadOfSkip,
                     ["EnableAnimations"] = FewTags.EnableAnimations,
                     ["IsOverlay"] = FewTags.isOverlay,

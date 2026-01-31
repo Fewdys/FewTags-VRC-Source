@@ -7,7 +7,21 @@
     public class FewTags
     {
         internal static int MaxPlatesPerUser, MaxNewlinesPerPlate, MaxPlateSize, FallbackSize, MaxTagLength, UpdateIntervalMinutes;
-        internal static bool CleanseTags, ReplaceInsteadOfSkip, BeepOnReuploaderDetected, EnableAnimations, isOverlay, DisableBigPlates, NoHTMLForMain, FewTagsEnabled, LimitNewLineOrLength, UnderNameplate;
+        internal static bool
+            ReplaceInsteadOfSkip,
+            BeepOnReuploaderDetected,
+            EnableAnimations,
+            isOverlay,
+            DisableBigPlates,
+            NoHTMLForMain,
+            SendTaggedIdiots,
+            FewTagsEnabled,
+            LimitNewLineOrLength,
+            UnderNameplate,
+            LimitSize,
+            RemoveAlphaTags,
+            RemoveInvalidSpaceTags;
+
         internal static HashSet<string> BlacklistedUserIDs = new HashSet<string>();
 
         internal const float Position = -126.95f, PositionTags = -154.95f, PositionID = -98.95f, PositionBigText = 344.75f;

@@ -1,9 +1,10 @@
-﻿using FewTags.FewTags.JSON;
+﻿using System.Net;
+using FewTags.FewTags.JSON;
 using FewTags.FewTags.Wrappers;
 using Il2CppSystem;
-using System.Net;
 using TMPro;
 using UnityEngine;
+using Valve.VR.InteractionSystem;
 
 namespace FewTags.FewTags
 {
@@ -162,13 +163,21 @@ namespace FewTags.FewTags
         /// <summary>
         /// Check If Players Tags Have Changed, If They Have Run PlateHandler On Player.
         /// </summary>
-        internal static void UpdatePlayerTags(VRC.Player vrcPlayer)
+        internal static void UpdatePlayerTags(VRC.Player vrcPlayer, bool Forced = false)
         {
             if (vrcPlayer == null || vrcPlayer.APIUser == null) return;
             string uid = vrcPlayer.APIUser.id;
             if (string.IsNullOrEmpty(uid)) return;
+            var records = FewTags.s_tags?.records;
+            if (records == null) return;
+            Jsons.Json.Tags[] snapshot;
+            try
+            {
+                snapshot = records.ToArray();
+            }
+            catch { return; }
 
-            var record = FewTags.s_tags?.records?.FirstOrDefault(r => r.UserID == uid);
+            var record = snapshot.FirstOrDefault(r => r.UserID == uid);
             /// 
             /// Custom Tag Checking Here If Wanted
             /// 
@@ -205,7 +214,7 @@ namespace FewTags.FewTags
 
             bool bigChanged = !lastBigPlateText.TryGetValue(uid, out var prevBig) || !string.Equals(prevBig?.Trim(), bigPlate?.Trim(), System.StringComparison.OrdinalIgnoreCase);
 
-            if (changed || bigChanged)
+            if (changed || bigChanged || Forced)
             {
                 ///
                 /// These Two Log Messages Are For Debugging You Can Comment Them Out!!
@@ -216,6 +225,72 @@ namespace FewTags.FewTags
                 /// End
                 ///
                 PlateHandlers.PlateHandler(vrcPlayer);
+            }
+        }
+
+        internal static void UpdatePlayerTags(VRCPlayer vrcPlayer, bool Forced = false)
+        {
+            if (vrcPlayer == null) return;
+            var player = vrcPlayer.gameObject.GetComponent<VRC.Player>();
+            if (player == null) return;
+            var apiuser = player.APIUser;
+            if (apiuser == null) return;
+            string uid = apiuser.id;
+            if (string.IsNullOrEmpty(uid)) return;
+
+            var records = FewTags.s_tags?.records;
+            if (records == null) return;
+            Jsons.Json.Tags[] snapshot;
+            try
+            {
+                snapshot = records.ToArray();
+            }
+            catch { return; }
+
+            var record = snapshot.FirstOrDefault(r => r.UserID == uid);
+            bool hasExternal = LocalTags.LocallyTagged.ContainsKey(uid) || LocalTags.LocallyTaggedByID.ContainsKey(uid);
+
+            if (record == null && !hasExternal) return;
+
+            var effectiveTags = new List<string>();
+
+            /// 
+            /// Custom Tag Checking Here If Wanted
+            /// 
+            if (LocalTags.LocallyTaggedByID.TryGetValue(uid, out var localTags)) // LOCAL TAGS !!
+            {
+                for (int i = 0; i < localTags.Count; i++)
+                {
+                    var tag = localTags[i];
+                    if (string.IsNullOrEmpty(tag)) continue;
+                    effectiveTags.Add(Utils.AddLocalTagPrefix(tag));
+                }
+            }
+            ///
+            /// End
+            /// 
+
+            if (record?.Tag != null) effectiveTags.AddRange(record.Tag);
+            effectiveTags = effectiveTags.Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(System.StringComparer.OrdinalIgnoreCase).ToList();
+
+            string[] currentTags = effectiveTags.ToArray();
+            string bigPlate = record?.PlateBigText ?? string.Empty;
+
+            bool changed = !lastAppliedTags.TryGetValue(uid, out var prevTags) || !Utils.NormalizeTags(prevTags).SequenceEqual(Utils.NormalizeTags(currentTags));
+
+            bool bigChanged = !lastBigPlateText.TryGetValue(uid, out var prevBig) || !string.Equals(prevBig?.Trim(), bigPlate?.Trim(), System.StringComparison.OrdinalIgnoreCase);
+
+            if (changed || bigChanged || Forced)
+            {
+                ///
+                /// These Two Log Messages Are For Debugging You Can Comment Them Out
+                /// 
+                LogManager.LogWarningToConsole($"Tags changed for {uid}: prev=[{string.Join(",", prevTags ?? System.Array.Empty<string>())}], curr=[{string.Join(",", currentTags ?? System.Array.Empty<string>())}]");
+                LogManager.LogWarningToConsole($"BigPlate changed for {uid}: prev=[{prevBig ?? "null"}], curr=[{bigPlate ?? "null"}]");
+                ///
+                /// End
+                ///
+                PlateHandlers.PlateHandler(player);
             }
         }
 

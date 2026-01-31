@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using System.Text.RegularExpressions;
+using UnityEngine;
 
 namespace FewTags.FewTags
 {
@@ -79,7 +80,7 @@ namespace FewTags.FewTags
                     }
                     else if (ptSize >= maxSize)
                     {
-                        LogManager.LogWarningToConsole($"{vrcPlayer.APIUser?.displayName}'s Tag Size Is Too Large ({sizeVal}{unit}). Defaulted to {fallbackSize}pt"); // feel free to comment out this line
+                        LogManager.LogWarningToConsole($"{vrcPlayer.APIUser?.displayName}'s Tag Size Is Too Large ({sizeVal}{unit}). Defaulted to {fallbackSize}pt");
                         replacement = $"<size={fallbackSize}>";
                     }
                     else
@@ -104,13 +105,13 @@ namespace FewTags.FewTags
         /// <param name="bigTag">The tag string to be cleansed and formatted.</param>
         /// <param name="vrcPlayer">The player context used to determine formatting constraints and validation rules.</param>
         /// <returns>A cleansed and formatted string suitable for use as a big plate tag.</returns>
-        public static string CleanseBigPlate(string bigTag, VRC.Player vrcPlayer)
+        public static string CleanseBigPlate(string bigTag, VRC.Player vrcPlayer, bool _FixSize, bool _RemoveInvalidSpaceTags, bool _RemoveAlphaTags)
         {
             string result = bigTag;
-            result = ReplaceNewlineTokens(result);
-            result = FixSize(result, vrcPlayer, 691, 80); // only being called here aswell to check for extra <size=xxx> inside the actual string for the tag
-            result = RemoveInvalidSpaceTags(result, vrcPlayer, isBig: true);
-            result = CleanAlphaTags(result);
+            result = ReplaceNewlineTokens(result); // always replace newlines
+            if (_FixSize) result = FixSize(result, vrcPlayer, FewTags.MaxPlateSize, FewTags.FallbackSize); // only being called here aswell to check for extra <size=xxx> inside the actual string for the tag
+            if (_RemoveInvalidSpaceTags) result = RemoveInvalidSpaceTags(result, vrcPlayer, isBig: true);
+            if (_RemoveAlphaTags) result = CleanAlphaTags(result);
             return result;
         }
 
@@ -125,13 +126,17 @@ namespace FewTags.FewTags
         /// <param name="tag">The original nameplate string to be cleansed and formatted.</param>
         /// <param name="vrcPlayer">The VRChat player whose nameplate is being processed. Used to determine formatting and validation context.</param>
         /// <returns>A cleansed and formatted string suitable for use as a VRChat nameplate.</returns>
-        public static string CleansePlate(string tag, VRC.Player vrcPlayer)
+        public static string CleansePlate(string tag, VRC.Player vrcPlayer, bool _FixSize, bool _RemoveInvalidSpaceTags, bool _RemoveAlphaTags)
         {
             string result = tag;
-            result = ReplaceNewlineTokens(result);
-            result = FixSize(result, vrcPlayer, 170, 25); // 20 is actualy default text size for vrc nameplate -- im using 25 as if found this means a size was trying to be used
-            result = RemoveInvalidSpaceTags(result, vrcPlayer, isBig: false);
-            result = CleanAlphaTags(result);
+            result = ReplaceNewlineTokens(result); // always replace newlines
+            if (_FixSize)
+            {
+                int maxSize = Math.Max(1, (int)Math.Ceiling(FewTags.MaxPlateSize / 2.0));
+                result = FixSize(result, vrcPlayer, maxSize, 20); // 20 is actualy default text size for vrc nameplate
+            }
+            if (_RemoveInvalidSpaceTags) result = RemoveInvalidSpaceTags(result, vrcPlayer, isBig: false);
+            if (_RemoveAlphaTags) result = CleanAlphaTags(result);
             return result;
         }
 
@@ -159,7 +164,7 @@ namespace FewTags.FewTags
                 string replacement;
                 if (ushort.TryParse(match.Groups[1].Value, out ushort spaceVal) && spaceVal >= 101)
                 {
-                    LogManager.LogWarningToConsole($"{vrcPlayer.APIUser?.displayName} Has A {(isBig ? "Big" : "Regular")} Tag With Spaces Of {spaceVal}. Defaulted To 10"); // feel free to comment out this line
+                    LogManager.LogWarningToConsole($"{vrcPlayer.APIUser?.displayName} Has A {(isBig ? "Big" : "Regular")} Tag With Spaces Of {spaceVal}. Defaulted To 10");
                     replacement = "<space=10>";
                 }
                 else
@@ -196,7 +201,6 @@ namespace FewTags.FewTags
         /// </summary>
         /// <param name="input">An array of strings in which to replace newline tokens. Can be null.</param>
         /// <returns>A new array of strings with newline tokens replaced by newline characters, or null if the input array is
-        /// null.</returns>
         private static string[] ReplaceNewlineTokens(string[] input)
         {
             if (input == null)
@@ -204,7 +208,6 @@ namespace FewTags.FewTags
 
             return input.Select(ReplaceNewlineTokens).ToArray();
         }
-
 
         /// <summary>
         /// Removes <alpha> tags from the input string when the specified alpha value indicates full transparency.

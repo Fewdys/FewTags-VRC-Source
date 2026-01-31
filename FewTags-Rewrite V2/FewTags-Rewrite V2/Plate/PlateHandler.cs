@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using FewTags.FewTags_Rewrite_V2.Util;
+using UnityEngine;
+using Valve.VR.InteractionSystem;
 
 namespace FewTags.FewTags
 {
@@ -58,13 +60,13 @@ namespace FewTags.FewTags
 
                 var textID = _platestatic.TextID;
 
-                textID.SetTextSafe("<color=#ffffff>[</color><color=#808080>" + founduser.id + "</color><color=#ffffff>]</color>"); // id
-                textID.SetOverlay();
+                textID?.SetTextSafe("<color=#ffffff>[</color><color=#808080>" + founduser.id + "</color><color=#ffffff>]</color>"); // id
+                textID?.SetOverlay();
 
                 var textM = _platestatic.TextM;
 
-                textM.SetTextSafe(founduser.Malicious ? FewTags.MaliciousStr : FewTags.FewTagsStr);
-                textM.SetOverlay();
+                textM?.SetTextSafe(founduser.Malicious ? FewTags.MaliciousStr : FewTags.FewTagsStr);
+                textM?.SetOverlay();
 
                 var textBP = _platestatic.TextBP;
                 var BPTextstr = founduser.PlateBigText;
@@ -72,30 +74,26 @@ namespace FewTags.FewTags
 
                 if (FewTags.DisableBigPlates) // if we have big plates disabled based on config, disable them
                 {
-                    textBP.gameObject.SetActive(false);
-                    textBP.enabled = false;
+                    textBP?.SetPlateActive(false);
                 }
                 else
                 {
-                    textBP.enabled = BPTextActive; // enable or disable plate text based on our bool
-                    textBP.gameObject.SetActive(BPTextActive); // enable or disable plate object based on our bool
-                    textBP.SetOverlay();
-
-                    if (FewTags.CleanseTags)
-                    {
-                        // if size isn't empty
-                        if (!string.IsNullOrEmpty(s_stringInstance))
-                        {
-                            s_stringInstance = TagCleanser.FixSize(s_stringInstance, vrcPlayer, FewTags.MaxPlateSize, FewTags.FallbackSize); // ensure we are in set size limit, if past it use fallback size
-                        }
-
-                        BPTextstr = TagCleanser.CleanseBigPlate(BPTextstr, vrcPlayer);
-                    }
+                    textBP?.SetPlateActive(BPTextActive);
+                    textBP?.SetOverlay();
+                    textBP?.SetColor(Color.white);
 
                     // check for newlines & length
                     int newlineCount = BPTextstr.Count(c => c == '\n' || c == '\v');
                     bool exceedsNewlines = newlineCount >= FewTags.MaxNewlinesPerPlate;
                     bool exceedsLength = founduser.PlateBigText.Length >= FewTags.MaxTagLength;
+
+                    // if size isn't empty and limit enabled
+                    if (!string.IsNullOrEmpty(s_stringInstance) && FewTags.LimitSize)
+                    {
+                        s_stringInstance = TagCleanser.FixSize(s_stringInstance, vrcPlayer, FewTags.MaxPlateSize, FewTags.FallbackSize); // ensure we are in set size limit, if past it use fallback size
+                    }
+
+                    BPTextstr = TagCleanser.CleanseBigPlate(BPTextstr, vrcPlayer, FewTags.LimitSize, FewTags.RemoveInvalidSpaceTags, FewTags.RemoveAlphaTags); // limit after checking these
 
                     if (exceedsNewlines || exceedsLength)
                     {
@@ -108,23 +106,22 @@ namespace FewTags.FewTags
                         }
                         else if (FewTags.LimitNewLineOrLength) // skip/hide the plate entirely
                         {
-                            textBP.gameObject.SetActive(false);
-                            textBP.enabled = false;
+                            textBP?.SetPlateActive(false);
                         }
 
-                        textBP.SetTextSafe(s_stringInstance + BPTextstr);
+                        textBP?.SetTextSafe(s_stringInstance + BPTextstr);
                     }
                     else // valid or allowed through aids
                     {
-                        textBP.SetTextSafe(s_stringInstance + BPTextstr); // set text
+                        textBP?.SetTextSafe(s_stringInstance + BPTextstr); // set text
                     }
 
                     if (Utils.NeedsAnimator(BPTextstr, out var applyAnim))
                     {
                         try
                         {
-                            var animator = _platestatic._gameObjectBP.GetComponent<TagAnimator>() ?? _platestatic._gameObjectBP.AddComponent<TagAnimator>();
-                            animator.originalText = Utils.ReplaceAniNames(textBP.text);
+                            var animator = Utils.GetOrAddAnimator(_platestatic, true);
+                            animator.originalText = Utils.ReplaceAniNames(Utils.GetText(textBP));
                             applyAnim?.Invoke(animator);
                         }
                         catch (Exception ex)
@@ -134,7 +131,7 @@ namespace FewTags.FewTags
                     }
                     else if (!FewTags.EnableAnimations)
                     {
-                        textBP.SetTextSafe(Utils.ReplaceAniNames(textBP.text));
+                        textBP?.SetTextSafe(Utils.ReplaceAniNames(Utils.GetText(textBP)));
                     }
                 }
 
@@ -210,7 +207,7 @@ namespace FewTags.FewTags
                 {
                     var tag = currentTags[i];
                     if ((tag.Contains("Known Ripper/Reuploader") || tag == "Known Ripper/Reuploader") && FewTags.BeepOnReuploaderDetected)
-                        Utils.AmongUsBeepAlt();
+                        ConsoleUtils.AmongUsBeep(); // feel free to change add you're own logic
 
                     var RemovedHTML = Utils.RemoveHtmlTags(tag);
 
@@ -219,11 +216,6 @@ namespace FewTags.FewTags
                     if (FewTags.NoHTMLForMain)
                     {
                         tag = RemovedHTML;
-                    }
-
-                    if (FewTags.CleanseTags)
-                    {
-                        tag = TagCleanser.CleansePlate(tag, vrcPlayer);
                     }
 
                     if (!FewTags.EnableAnimations)
@@ -235,6 +227,8 @@ namespace FewTags.FewTags
                     int newlineCount = tag.Count(c => c == '\n' || c == '\v');
                     bool isTooLong = tag.Length >= FewTags.MaxTagLength;
                     bool hasTooManyLines = newlineCount >= FewTags.MaxNewlinesPerPlate;
+
+                    tag = TagCleanser.CleansePlate(tag, vrcPlayer, FewTags.LimitSize, FewTags.RemoveInvalidSpaceTags, FewTags.RemoveAlphaTags);
 
                     if (FewTags.ReplaceInsteadOfSkip) // replace if needed
                     {
@@ -259,19 +253,14 @@ namespace FewTags.FewTags
                     plateText?.SetOverlay();
                     plateText?.SetColor(Color.white);
 
+                    // Handle animator - check if animation needs changed
                     bool needsAnim = Utils.NeedsAnimator(tag, out var applyAnim);
-
-                    var plateAnimator = plate.Animator;
 
                     if (needsAnim)
                     {
-                        if (plateAnimator == null)
-                        {
-                            // no animator exists, create one
-                            plateAnimator = plate._gameObject.AddComponent<TagAnimator>();
-                            plateAnimator.originalText = tag;
-                            applyAnim?.Invoke(plateAnimator);
-                        }
+                        var plateAnimator = Utils.GetOrAddAnimator(plate);
+                        plateAnimator.originalText = tag;
+                        applyAnim?.Invoke(plateAnimator);
                     }
 
                     platesForUser.Add(plate);
