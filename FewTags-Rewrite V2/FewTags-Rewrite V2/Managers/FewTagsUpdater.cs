@@ -1,10 +1,7 @@
 ﻿using System.Net;
 using FewTags.FewTags.JSON;
-using FewTags.FewTags.Wrappers;
 using Il2CppSystem;
-using TMPro;
 using UnityEngine;
-using Valve.VR.InteractionSystem;
 
 namespace FewTags.FewTags
 {

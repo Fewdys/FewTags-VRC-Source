@@ -1,9 +1,5 @@
-﻿using FewTags.FewTags.Wrappers;
-using System;
-using System.Linq;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
-using VRC.SDKBase;
 
 namespace FewTags.FewTags
 {

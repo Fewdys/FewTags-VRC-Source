@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace FewTags.FewTags_Rewrite_V2.Util
+﻿namespace FewTags.FewTags_Rewrite_V2.Util
 {
     internal class ConsoleUtils
     {

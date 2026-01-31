@@ -1,6 +1,5 @@
 ﻿using FewTags.FewTags_Rewrite_V2.Util;
 using UnityEngine;
-using Valve.VR.InteractionSystem;
 
 namespace FewTags.FewTags
 {
@@ -207,7 +206,7 @@ namespace FewTags.FewTags
                 {
                     var tag = currentTags[i];
                     if ((tag.Contains("Known Ripper/Reuploader") || tag == "Known Ripper/Reuploader") && FewTags.BeepOnReuploaderDetected)
-                        ConsoleUtils.AmongUsBeep(); // feel free to change add you're own logic
+                        ConsoleUtils.AmongUsBeep(); // feel free to change or add you're own logic
 
                     var RemovedHTML = Utils.RemoveHtmlTags(tag);
 

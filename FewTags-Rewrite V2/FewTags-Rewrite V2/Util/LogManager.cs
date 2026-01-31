@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace FewTags.FewTags
+﻿namespace FewTags.FewTags
 {
     internal class LogManager
     {
