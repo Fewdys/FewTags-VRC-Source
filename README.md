@@ -7,7 +7,7 @@
 #### Animated Tags Are $4 Per Animated Tag (Paypal Friends & Family or 2 Months Of Discord Nitro Basic -- I Don't Like Crypto, Sorry <3)
 ##### For Payment Please Either DM Me Directly On Discord @FewTags or @Fewdy or Join The Discord Server & Make A Ticket *Preferably Join The Discord Server & Make A Ticket*
 #### Developers *May* or *May Not* Recieve Animated Tags For Free
-##### [Discord Server Link](https://discord.gg/4mf3kwkvGf)
+##### [Discord Server Link](https://discord.gg/rAFDztj6qD)
 
 ## Example Of How Local Tags Text File Should Look
 ```
