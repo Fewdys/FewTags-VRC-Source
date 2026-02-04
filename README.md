@@ -4,7 +4,7 @@
 </p>
 
 # Outside Of Local Tagging, Animated Tags Are Not Free. Normal Ones However Are
-#### Animated Tags Are $4 Per Animated Tag (Paypal Friends & Family or 2 Months Of Discord Nitro Basic -- I Don't Like Crypto, Sorry <3)
+#### Animated Tags Are $4 Per Animated Tag (Paypal Friends & Family or 2 Months Of Discord Nitro Basic [MUST Be From OFFICIAL DISCORD, No Trials Accepted] -- I Don't Like Crypto, Sorry <3)
 ##### For Payment Please Either DM Me Directly On Discord @FewTags or @Fewdy or Join The Discord Server & Make A Ticket *Preferably Join The Discord Server & Make A Ticket*
 #### Developers *May* or *May Not* Recieve Animated Tags For Free
 ##### [Discord Server Link](https://discord.gg/rAFDztj6qD)
