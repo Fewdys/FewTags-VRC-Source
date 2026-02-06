@@ -2,6 +2,7 @@
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
 using FewTags.FewTags.Patches;
+using FewTags.FewTags_Rewrite_V2.Managers;
 using HarmonyLib;
 using Il2CppInterop.Runtime.Injection;
 using System;
@@ -35,10 +36,11 @@ namespace FewTags.FewTags
 
             ClassInjector.RegisterTypeInIl2Cpp<TagAnimator>();
             ClassInjector.RegisterTypeInIl2Cpp<MenuDetector>();
+            ClassInjector.RegisterTypeInIl2Cpp<UnityMainThreadDispatcher>();
 
             OnPlayer.PatchOnPlayer();
             FewTagsConfigLoader.Load();
-            FewTagsUpdater.UpdateTags();
+            FewTagsUpdater.UpdateTagsAsync();
             LocalTags.LoadLocalTags();
             // add you're logic
 
@@ -60,10 +62,11 @@ namespace FewTags.FewTags
             //new WaitForSeconds(3f);
             ClassInjector.RegisterTypeInIl2Cpp<TagAnimator>();
             ClassInjector.RegisterTypeInIl2Cpp<MenuDetector>();
+            ClassInjector.RegisterTypeInIl2Cpp<UnityMainThreadDispatcher>();
 
             OnPlayer.PatchOnPlayer();
             FewTagsConfigLoader.Load();
-            FewTagsUpdater.UpdateTags();
+            FewTagsUpdater.UpdateTagsAsync();
             LocalTags.LoadLocalTags();
 
             //FewTagsUpdater.DoUpdate(); // add this to either to the update of a monobehaviour or you're OnUpdate loop

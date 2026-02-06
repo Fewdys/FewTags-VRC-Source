@@ -1,5 +1,5 @@
-﻿using System.Net;
-using FewTags.FewTags.JSON;
+﻿using FewTags.FewTags.JSON;
+using FewTags.FewTags_Rewrite_V2.Managers;
 using Il2CppSystem;
 using UnityEngine;
 
@@ -12,6 +12,16 @@ namespace FewTags.FewTags
 
         internal static string url = "https://raw.githubusercontent.com/Fewdys/FewTags/main/FewTags.json";
         internal static float updateInterval = 0f;
+        internal static readonly HttpClient httpClient = new HttpClient();
+        internal static System.Threading.CancellationTokenSource cancellationTokenSource;
+        //private static readonly List<string> tagsList = new List<string>();
+        internal static bool isUpdating = false;
+
+        static FewTagsUpdater()
+        {
+            httpClient.Timeout = System.TimeSpan.FromSeconds(30);
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "FewTags/1.0");
+        }
 
         /// <summary>
         /// Main Update Loop For Fetching Tags (Put This On Main Update Loop Or A Monobehaviour Update).
@@ -23,7 +33,7 @@ namespace FewTags.FewTags
             {
                 FewTagsConfigLoader.Load();
                 updateInterval = Time.realtimeSinceStartup + (FewTags.UpdateIntervalMinutes * 60f);
-                UpdateTags();
+                UpdateTagsAsync();
                 UpdateAllPlayersTagsLive();
             }
 
@@ -36,126 +46,133 @@ namespace FewTags.FewTags
         /// <summary>
         /// Fetches Tag Database.
         /// </summary>
-        internal static void UpdateTags()
+        internal static void UpdateTagsAsync()
         {
+            if (isUpdating) return;
 
-            try
+            isUpdating = true;
+
+            Task.Run(async () =>
             {
-
-                if (string.IsNullOrEmpty(url))
+                try
                 {
-                    using (WebClient wc = new WebClient())
+                    if (string.IsNullOrEmpty(url))
                     {
-                        FewTags.s_rawTags = File.ReadAllText("C:\\Users\\Fewdy\\source\\repos\\FewTags\\FewTags.json"); // change path if you downloaded the json either manually or to a specific place and want to use local file
-
-                        if (string.IsNullOrEmpty(FewTags.s_rawTags))
+                        UnityMainThreadDispatcher.Instance().Enqueue(() =>
                         {
-                            return;
-                        }
-
-                        JSONNode jsonNode = JSON.JSON.Parse(FewTags.s_rawTags);
-                        if (jsonNode == null)
-                        {
-                            return;
-                        }
-
-                        FewTags.s_tags = new Jsons.Json._Tags { records = new List<Jsons.Json.Tags>() };
-
-                        var records = jsonNode["records"].AsArray;
-                        for (int i = 0; i < records.Count; i++)
-                        {
-                            var record = records[i];
-                            List<string> tagsList = new List<string>();
-
-                            var tagArray = record["Tag"].AsArray;
-                            for (int j = 0; j < tagArray.Count; j++)
-                            {
-                                tagsList.Add(tagArray[j].Value);
-                            }
-
-                            Jsons.Json.Tags tagEntry = new Jsons.Json.Tags
-                            {
-                                id = record["id"].AsInt,
-                                UserID = record["UserID"],
-                                PlateText = record["PlateText"],
-                                PlateBigText = record["PlateBigText"],
-                                Malicious = record["Malicious"].AsBool,
-                                Active = record["Active"].AsBool,
-                                TextActive = record["TextActive"].AsBool,
-                                BigTextActive = record["BigTextActive"].AsBool,
-                                Size = record["Size"],
-                                Tag = tagsList.ToArray()
-                            };
-
-                            FewTags.s_tags.records.Add(tagEntry);
-                        }
-
-                        //LogManager.LogToConsole($"Record Count: {FewTags.s_tags.records.Count}");
+                            LoadTags(System.IO.File.ReadAllText("C:\\Users\\Fewdy\\source\\repos\\FewTags\\FewTags.json"));
+                        });
                         return;
                     }
-                }
-                else
-                {
 
-                    using (WebClient wc = new WebClient())
+                    cancellationTokenSource = new System.Threading.CancellationTokenSource();
+
+                    using (var response = await httpClient.GetAsync(url, cancellationTokenSource.Token))
                     {
-                        FewTags.s_rawTags = wc.DownloadString(url);
+                        response.EnsureSuccessStatusCode();
+                        var result = await response.Content.ReadAsStringAsync(cancellationTokenSource.Token);
 
-                        if (string.IsNullOrEmpty(FewTags.s_rawTags))
+                        if (!string.IsNullOrEmpty(result))
                         {
-                            LogManager.LogErrorToConsole("s_rawTags is Null");
-                            return;
-                        }
-
-                        JSONNode jsonNode = JSON.JSON.Parse(FewTags.s_rawTags);
-                        if (jsonNode == null)
-                        {
-                            LogManager.LogErrorToConsole("JsonNode is Null");
-                            return;
-                        }
-
-                        FewTags.s_tags = new Jsons.Json._Tags { records = new List<Jsons.Json.Tags>() };
-
-                        var records = jsonNode["records"].AsArray; // jsonNode.AsArray if you're reading the file without the records part
-                        for (int i = 0; i < records.Count; i++)
-                        {
-                            var record = records[i];
-                            List<string> tagsList = new List<string>();
-
-                            var tagArray = record["Tag"].AsArray;
-                            for (int j = 0; j < tagArray.Count; j++)
+                            UnityMainThreadDispatcher.Instance().Enqueue(() =>
                             {
-                                tagsList.Add(tagArray[j].Value);
-                            }
-
-                            Jsons.Json.Tags tagEntry = new Jsons.Json.Tags
-                            {
-                                id = record["id"].AsInt,
-                                UserID = record["UserID"],
-                                PlateText = record["PlateText"],
-                                PlateBigText = record["PlateBigText"],
-                                Malicious = record["Malicious"].AsBool,
-                                Active = record["Active"].AsBool,
-                                TextActive = record["TextActive"].AsBool,
-                                BigTextActive = record["BigTextActive"].AsBool,
-                                Size = record["Size"],
-                                Tag = tagsList.ToArray()
-                            };
-
-                            FewTags.s_tags.records.Add(tagEntry);
+                                LoadTags(result);
+                            });
                         }
-
-                        //LogManager.LogToConsole($"Record Count: {FewTags.s_tags.records.Count}");
-                        return;
                     }
                 }
+                catch (TaskCanceledException)
+                {
+                    LogManager.LogErrorToConsole("Download was cancelled");
+                }
+                catch (HttpRequestException ex)
+                {
+                    LogManager.LogErrorToConsole($"HTTP request error: {ex.Message}");
+                }
+                catch (System.Exception ex)
+                {
+                    LogManager.LogErrorToConsole($"Update error: {ex.Message}");
+                }
+                finally
+                {
+                    isUpdating = false;
+                    cancellationTokenSource?.Dispose();
+                    cancellationTokenSource = null;
+                }
+            });
+        }
+
+        internal static void LoadTags(string rawJson)
+        {
+            if (string.IsNullOrEmpty(rawJson))
+            {
+                LogManager.LogErrorToConsole("Raw JSON is null or empty.");
+                return;
             }
-            catch (System.Exception ex)
+
+            FewTags.s_rawTags = rawJson;
+
+            JSONNode jsonNode = JSON.JSON.Parse(rawJson);
+            if (jsonNode == null)
             {
-                url = string.Empty;
-                LogManager.LogErrorToConsole($"Error in UpdateTags: {ex.Message}\n{ex.StackTrace}\n{ex}");
+                LogManager.LogErrorToConsole("JSON parse failed.");
+                return;
+            }
+
+            if (FewTags.s_tags == null)
+                FewTags.s_tags = new Jsons.Json._Tags { records = new List<Jsons.Json.Tags>() };
+            else
+                FewTags.s_tags.records.Clear();
+
+            JSONArray records;
+            if (jsonNode is JSONArray array)
+            {
+                records = array;
+            }
+            else if (jsonNode["records"] != null && jsonNode["records"].IsArray)
+            {
+                records = jsonNode["records"].AsArray;
+            }
+            else
+            {
+                LogManager.LogErrorToConsole("Invalid JSON format: no records found");
+                return;
+            }
+
+            if (records == null)
+            {
+                LogManager.LogErrorToConsole("No valid 'records' array.");
+                return;
+            }
+
+            for (int i = 0; i < records.Count; i++)
+            {
+                var record = records[i];
+                var tagArray = record["Tag"].AsArray;
+
+                var tagsList = new List<string>();
+                if (tagArray != null)
+                {
+                    for (int j = 0; j < tagArray.Count; j++)
+                        tagsList.Add(tagArray[j].Value);
+                }
+
+                FewTags.s_tags.records.Add(new Jsons.Json.Tags
+                {
+                    id = record["id"].AsInt,
+                    UserID = record["UserID"],
+                    PlateText = record["PlateText"],
+                    PlateBigText = record["PlateBigText"],
+                    Malicious = record["Malicious"].AsBool,
+                    Active = record["Active"].AsBool,
+                    TextActive = record["TextActive"].AsBool,
+                    BigTextActive = record["BigTextActive"].AsBool,
+                    Size = record["Size"],
+                    Tag = tagsList.ToArray()
+                });
             }
         }
+
 
         /// <summary>
         /// Check If Players Tags Have Changed, If They Have Run PlateHandler On Player.
