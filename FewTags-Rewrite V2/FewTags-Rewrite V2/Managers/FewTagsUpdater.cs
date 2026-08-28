@@ -527,7 +527,7 @@ namespace FewTags.FewTags
                 if (LocalTags.LocallyTaggedByID.TryGetValue(uid, out var rawList))
                     localTagsCopy = new List<string>(rawList);
             }
-            bool hasExternal = hasLocallyTagged || localTagsCopy != null;
+            bool hasExternal = hasLocallyTagged || localTagsCopy != null; // Any bool check you add also go here once assigned
 
             int capacity = (localTagsCopy?.Count ?? 0) + (record?.Tag?.Length ?? 0);
 
