@@ -2,6 +2,7 @@
 {
     internal static class LocalTags
     {
+        internal static readonly object Lock = new object();
         internal static readonly Dictionary<string, string> LocallyTagged = new(StringComparer.OrdinalIgnoreCase);
         internal static readonly Dictionary<string, List<string>> LocallyTaggedByID = new(StringComparer.OrdinalIgnoreCase);
 

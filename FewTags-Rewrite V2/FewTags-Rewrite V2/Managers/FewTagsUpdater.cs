@@ -1,175 +1,495 @@
-﻿using FewTags.FewTags.JSON;
+﻿using System.Collections;
+using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Sockets;
+using System.Reflection;
+using System.Text.Json;
+using FewTags.FewTags_Rewrite_V2;
 using FewTags.FewTags_Rewrite_V2.Managers;
-using Il2CppSystem;
+using Nyup_FewTags._Plate;
 using UnityEngine;
 
 namespace FewTags.FewTags
 {
     public class FewTagsUpdater
     {
-        internal static readonly Dictionary<string, string[]> lastAppliedTags = new();
-        internal static readonly Dictionary<string, string> lastBigPlateText = new();
+        internal static readonly ConcurrentDictionary<string, string[]> lastAppliedTags = new();
+        internal static readonly ConcurrentDictionary<string, string> lastBigPlateText = new();
 
+        private static readonly ConcurrentDictionary<string, string[]> _normalizedTagCache = new();
+
+        internal static readonly ConcurrentQueue<System.Action> _mainThreadQueue = new();
+
+        //internal static string url = "http://localhost:5000/tags";
         internal static string url = "https://raw.githubusercontent.com/Fewdys/FewTags/main/FewTags.json";
         internal static float updateInterval = 0f;
-        internal static readonly HttpClient httpClient = new HttpClient();
-        internal static System.Threading.CancellationTokenSource cancellationTokenSource;
-        //private static readonly List<string> tagsList = new List<string>();
-        internal static bool isUpdating = false;
+        internal static float LastTime = 0f;
 
-        static FewTagsUpdater()
+        private static float _cachedIntervalSeconds = -1f;
+        private static string _lastETag = null;
+        private static bool firstinit = true;
+
+        private const float GitHubMinIntervalSeconds = 90f;
+        private static bool IsGitHubUrl => !string.IsNullOrEmpty(url) &&
+            (url.Contains("raw.githubusercontent.com") || url.Contains("github.com"));
+
+        internal static readonly ConcurrentDictionary<string, Jsons.Json.Tags> _tagLookup = new();
+
+        // HttpClient reused across requests for connection pooling.
+        // Called synchronously via .GetAwaiter().GetResult() on a null-SynchronizationContext thread.
+        private static HttpClient _httpClient;
+        private static readonly object _httpClientLock = new object();
+        private static bool _warmed = false;
+        private static readonly object _lock = new object();
+
+        public static HttpClient GetHttpClient()
         {
-            httpClient.Timeout = System.TimeSpan.FromSeconds(30);
-            httpClient.DefaultRequestHeaders.Add("User-Agent", "FewTags/1.0");
+            if (_httpClient != null) return _httpClient;
+            lock (_httpClientLock)
+            {
+                if (_httpClient != null) return _httpClient;
+
+                var handler = new HttpClientHandler
+                {
+                    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+                };
+                _httpClient = new HttpClient(handler)
+                {
+                    Timeout = TimeSpan.FromSeconds(30),
+                };
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", "FewTags/1.0");
+                return _httpClient;
+            }
         }
 
-        /// <summary>
-        /// Main Update Loop For Fetching Tags (Put This On Main Update Loop Or A Monobehaviour Update).
-        /// </summary>
-        internal static void DoUpdate()
+        private static Thread _pollThread;
+        private static CancellationTokenSource _pollCts;
+
+        internal static void StartBackgroundPoller()
         {
+            // Ensure any previous poller is fully stopped before starting a new one,
+            // so we never have two threads hitting FetchTagsSync concurrently.
+            StopBackgroundPoller();
 
-            if (Time.realtimeSinceStartup >= updateInterval)
+            _pollCts = new CancellationTokenSource();
+
+            _pollThread = new Thread(() => PollThreadProc(_pollCts.Token))
             {
-                FewTagsConfigLoader.Load();
-                updateInterval = Time.realtimeSinceStartup + (FewTags.UpdateIntervalMinutes * 60f);
-                UpdateTagsAsync();
-                UpdateAllPlayersTagsLive();
+                IsBackground = true,
+                Name = "FewTagsPoller"
+            };
+            _pollThread.Start();
+        }
+
+        private static bool ProbeServer(string url, TimeSpan timeout)
+        {
+            try
+            {
+                var uri = new Uri(url);
+
+                if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                IPAddress[] addresses;
+
+                try
+                {
+                    addresses = Dns.GetHostAddresses(uri.Host);
+                }
+                catch
+                {
+                    return false;
+                }
+
+                if (addresses == null || addresses.Length == 0)
+                    return false;
+
+                int port = uri.IsDefaultPort
+                    ? (uri.Scheme == Uri.UriSchemeHttps ? 443 : 80)
+                    : uri.Port;
+
+                for (int i = 0; i < addresses.Length; i++)
+                {
+                    Socket socket = null;
+                    SocketAsyncEventArgs args = null;
+                    ManualResetEventSlim completed = null;
+
+                    try
+                    {
+                        socket = new Socket(
+                            addresses[i].AddressFamily,
+                            SocketType.Stream,
+                            ProtocolType.Tcp);
+
+                        completed = new ManualResetEventSlim(false);
+
+                        args = new SocketAsyncEventArgs
+                        {
+                            RemoteEndPoint = new IPEndPoint(addresses[i], port)
+                        };
+
+                        args.Completed += (s, e) =>
+                        {
+                            try
+                            {
+                                completed.Set();
+                            }
+                            catch
+                            {
+                            }
+                        };
+
+                        bool pending = socket.ConnectAsync(args);
+
+                        if (!pending)
+                        {
+                            if (args.SocketError == SocketError.Success)
+                                return true;
+
+                            continue;
+                        }
+
+                        if (!completed.Wait(timeout))
+                            continue;
+
+                        if (args.SocketError == SocketError.Success)
+                            return true;
+                    }
+                    catch
+                    {
+                        // Connection refused / timeout / invalid address/etc.
+                        // Treat all of them as unreachable.
+                    }
+                    finally
+                    {
+                        try { args?.Dispose(); } catch { }
+                        try { socket?.Close(); } catch { }
+                        try { completed?.Dispose(); } catch { }
+                    }
+                }
+
+                return false;
             }
-
-            if (Input.GetKey(KeyCode.RightShift) && Input.GetKeyDown(KeyCode.O))
+            catch
             {
-                PlateFunctions.CheckNameplateESPBind();
+                return false;
             }
         }
 
-        /// <summary>
-        /// Fetches Tag Database.
-        /// </summary>
-        internal static void UpdateTagsAsync()
+        internal static void StopBackgroundPoller()
         {
-            if (isUpdating) return;
+            _pollCts?.Cancel();
+            // Give the in-flight request a real chance to unwind before we let go of it.
+            _pollThread?.Join(TimeSpan.FromSeconds(2));
+            _pollThread = null;
+            _pollCts?.Dispose();
+            _pollCts = null;
+        }
 
-            isUpdating = true;
+        private static float GetIntervalSeconds()
+        {
+            if (_cachedIntervalSeconds >= 0f) return _cachedIntervalSeconds;
 
-            Task.Run(async () =>
+            float configured = FewTags.UpdateIntervalMinutes * 60f;
+            if (IsGitHubUrl && configured < GitHubMinIntervalSeconds)
+            {
+                LogManager.LogWarningToConsole($"GitHub URL detected — enforcing {GitHubMinIntervalSeconds}s minimum interval.");
+                _cachedIntervalSeconds = GitHubMinIntervalSeconds;
+            }
+            else
+            {
+                _cachedIntervalSeconds = configured;
+            }
+
+            return _cachedIntervalSeconds;
+        }
+
+        private static void PollThreadProc(CancellationToken ct)
+        {
+            // Null out Unity's SynchronizationContext on this thread — absolute guarantee.
+            // ConfigureAwait(false) is best-effort in Mono; this is not.
+            SynchronizationContext.SetSynchronizationContext(null);
+
+            ct.WaitHandle.WaitOne(3000); // startup delay
+
+            while (!ct.IsCancellationRequested)
             {
                 try
                 {
-                    if (string.IsNullOrEmpty(url))
-                    {
-                        UnityMainThreadDispatcher.Instance().Enqueue(() =>
-                        {
-                            LoadTags(System.IO.File.ReadAllText("C:\\Users\\Fewdy\\source\\repos\\FewTags\\FewTags.json"));
-                        });
-                        return;
-                    }
-
-                    cancellationTokenSource = new System.Threading.CancellationTokenSource();
-
-                    using (var response = await httpClient.GetAsync(url, cancellationTokenSource.Token))
-                    {
-                        response.EnsureSuccessStatusCode();
-                        var result = await response.Content.ReadAsStringAsync(cancellationTokenSource.Token);
-
-                        if (!string.IsNullOrEmpty(result))
-                        {
-                            UnityMainThreadDispatcher.Instance().Enqueue(() =>
-                            {
-                                LoadTags(result);
-                            });
-                        }
-                    }
-                }
-                catch (TaskCanceledException)
-                {
-                    LogManager.LogErrorToConsole("Download was cancelled");
-                }
-                catch (HttpRequestException ex)
-                {
-                    LogManager.LogErrorToConsole($"HTTP request error: {ex.Message}");
+                    bool changed = FetchTagsSync(ct);
+                    if (changed)
+                        _mainThreadQueue.Enqueue(() => UpdateAllPlayersOnMainThread());
                 }
                 catch (System.Exception ex)
                 {
-                    LogManager.LogErrorToConsole($"Update error: {ex.Message}");
+                    LogManager.LogErrorToConsole($"Poll error: {ex.Message}");
                 }
-                finally
+
+                int intervalMs = (int)(GetIntervalSeconds() * 1000f);
+                ct.WaitHandle.WaitOne(intervalMs);
+            }
+        }
+
+        private static bool FetchTagsSync(CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(url))
+            {
+                try
                 {
-                    isUpdating = false;
-                    cancellationTokenSource?.Dispose();
-                    cancellationTokenSource = null;
+                    var bytes = System.IO.File.ReadAllBytes("...\\FewTags.json");
+                    LoadTags(bytes);
+                    return true;
+                }
+                catch (System.Exception ex)
+                {
+                    LogManager.LogErrorToConsole($"Local load error: {ex.Message}");
+                    return false;
+                }
+            }
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+
+                // Avoid reusing a pooled connection that the local server may have already
+                // closed on its end — prevents ObjectDisposedException from stale keep-alives.
+                request.Headers.ConnectionClose = true;
+
+                if (!string.IsNullOrEmpty(_lastETag))
+                    request.Headers.TryAddWithoutValidation("If-None-Match", _lastETag);
+
+                if (IsGitHubUrl)
+                    request.Headers.TryAddWithoutValidation("Accept", "application/vnd.github.v3.raw");
+
+                if (!ProbeServer(url, TimeSpan.FromMilliseconds(100)))
+                {
+                    LogManager.LogWarningToConsole(
+                        $"FewTags server unreachable: {url}");
+
+                    return false;
+                }
+
+                HttpResponseMessage response;
+
+                try
+                {
+                    response = GetHttpClient()
+                        .SendAsync(
+                            request,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            ct)
+                        .GetAwaiter()
+                        .GetResult();
+                }
+                catch (ObjectDisposedException)
+                {
+                    LogManager.LogErrorToConsole(
+                        "Local server connection was closed. Skipping this poll.");
+
+                    return false;
+                }
+
+                using (response)
+                {
+                    if (response.StatusCode == HttpStatusCode.NotModified)
+                        return false;
+
+                    if (IsGitHubUrl && (response.StatusCode == HttpStatusCode.Forbidden || (int)response.StatusCode == 429))
+                    {
+                        LogManager.LogErrorToConsole("Rate limited by GitHub. Increase UpdateIntervalMinutes in config.");
+                        return false;
+                    }
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        LogManager.LogErrorToConsole($"HTTP error: {response.StatusCode}");
+                        return false;
+                    }
+
+                    if (response.Headers.TryGetValues("ETag", out var etagValues))
+                        _lastETag = string.Concat(etagValues);
+
+                    byte[] body;
+                    try
+                    {
+                        using var responseStream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                        using var ms = new MemoryStream();
+                        var buffer = new byte[8192];
+                        int read;
+                        while ((read = responseStream.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            ct.ThrowIfCancellationRequested();
+                            ms.Write(buffer, 0, read);
+                        }
+                        body = ms.ToArray();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        LogManager.LogErrorToConsole("Local server closed the connection mid-read. Skipping this poll.");
+                        return false;
+                    }
+
+                    if (body != null && body.Length > 0)
+                    {
+                        LogManager.LogToConsole($"Tags changed, {body.Length} bytes{(IsGitHubUrl ? " (GitHub)" : "")}.");
+                        LoadTags(body);
+                        return true;
+                    }
+
+                    return false;
+                }
+            }
+            catch (TaskCanceledException) when (ct.IsCancellationRequested)
+            {
+                // expected during shutdown/reload — not an error
+                return false;
+            }
+            catch (TaskCanceledException)
+            {
+                LogManager.LogErrorToConsole("Request timed out.");
+                return false;
+            }
+            catch (ObjectDisposedException)
+            {
+                LogManager.LogErrorToConsole("Connection was disposed mid-request. Skipping this poll.");
+                return false;
+            }
+            catch (HttpRequestException ex)
+            {
+                LogManager.LogErrorToConsole($"HTTP request error: {ex.Message}");
+                return false;
+            }
+            catch (System.Net.WebException ex)
+            {
+                // Mono's HttpClientHandler can leak raw WebException instead of
+                // wrapping it in HttpRequestException — same "server not reachable" case.
+                LogManager.LogErrorToConsole($"Local server unreachable: {ex.Status} — {ex.Message}");
+                return false;
+            }
+            catch (System.Exception ex)
+            {
+                LogManager.LogErrorToConsole($"FetchTagsSync error: {ex.Message}");
+                return false;
+            }
+        }
+
+        // Force an immediate re-fetch e.g. on config reload
+        internal static void UpdateFewTags(bool ReloadConfig = false)
+        {
+            if (ReloadConfig)
+            {
+                FewTagsConfigLoader.Load();
+                _cachedIntervalSeconds = -1f;
+            }
+
+            var t = new Thread(() =>
+            {
+                SynchronizationContext.SetSynchronizationContext(null);
+                try
+                {
+                    bool changed = FetchTagsSync();
+                    if (changed)
+                        _mainThreadQueue.Enqueue(() => CoroutineHelper.RunSafe(UpdateAllPlayersOnMainThread()));
+                }
+                catch (System.Exception ex)
+                {
+                    LogManager.LogErrorToConsole($"Force update error: {ex.Message}");
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "FewTagsForceUpdate"
+            };
+            t.Start();
+        }
+
+        public static Task<bool> GetTagsSafe()
+        {
+            return Task.Run(() =>
+            {
+                SynchronizationContext.SetSynchronizationContext(null);
+                try { return FetchTagsSync(); }
+                catch (System.Exception ex)
+                {
+                    LogManager.LogErrorToConsole($"GetTagsSafe error: {ex.Message}");
+                    return false;
                 }
             });
         }
 
-        internal static void LoadTags(string rawJson)
+        internal static void DoUpdate()
         {
-            if (string.IsNullOrEmpty(rawJson))
+            while (_mainThreadQueue.TryDequeue(out var action))
+                action();
+
+            if (Input.GetKeyDown(KeyCode.O) && Input.GetKey(KeyCode.RightShift))
+                PlateFunctions.CheckNameplateESPBind();
+        }
+
+        internal static void LoadTags(byte[] rawJsonBytes)
+        {
+            if (rawJsonBytes == null || rawJsonBytes.Length == 0)
             {
-                LogManager.LogErrorToConsole("Raw JSON is null or empty.");
+                LogManager.LogErrorToConsole("Raw JSON bytes are null or empty.");
                 return;
             }
 
-            FewTags.s_rawTags = rawJson;
+            FewTagsResolver.EnsureRegistered();
 
-            JSONNode jsonNode = JSON.JSON.Parse(rawJson);
-            if (jsonNode == null)
-            {
-                LogManager.LogErrorToConsole("JSON parse failed.");
-                return;
-            }
+            FewTags.s_rawTags = System.Text.Encoding.UTF8.GetString(rawJsonBytes);
 
-            if (FewTags.s_tags == null)
-                FewTags.s_tags = new Jsons.Json._Tags { records = new List<Jsons.Json.Tags>() };
-            else
-                FewTags.s_tags.records.Clear();
+            try
+            {
+                List<Jsons.Json.Tags> records = null;
 
-            JSONArray records;
-            if (jsonNode is JSONArray array)
-            {
-                records = array;
-            }
-            else if (jsonNode["records"] != null && jsonNode["records"].IsArray)
-            {
-                records = jsonNode["records"].AsArray;
-            }
-            else
-            {
-                LogManager.LogErrorToConsole("Invalid JSON format: no records found");
-                return;
-            }
-
-            if (records == null)
-            {
-                LogManager.LogErrorToConsole("No valid 'records' array.");
-                return;
-            }
-
-            for (int i = 0; i < records.Count; i++)
-            {
-                var record = records[i];
-                var tagArray = record["Tag"].AsArray;
-
-                var tagsList = new List<string>();
-                if (tagArray != null)
+                try
                 {
-                    for (int j = 0; j < tagArray.Count; j++)
-                        tagsList.Add(tagArray[j].Value);
+                    int i = 0;
+                    while (i < rawJsonBytes.Length && (rawJsonBytes[i] == ' ' || rawJsonBytes[i] == '\t' || rawJsonBytes[i] == '\r' || rawJsonBytes[i] == '\n'))
+                        i++;
+
+                    bool isArray = i < rawJsonBytes.Length && rawJsonBytes[i] == (byte)'[';
+
+                    records = isArray ? JsonSerializer.Deserialize<List<Jsons.Json.Tags>>(rawJsonBytes) : JsonSerializer.Deserialize<Jsons.Json._Tags>(rawJsonBytes)?.records;
+                }
+                catch (System.Exception ex)
+                {
+                    LogManager.LogErrorToConsole($"JSON deserialize failed (both formats): {ex.Message}");
+                    return;
                 }
 
-                FewTags.s_tags.records.Add(new Jsons.Json.Tags
+                if (records == null)
                 {
-                    id = record["id"].AsInt,
-                    UserID = record["UserID"],
-                    PlateText = record["PlateText"],
-                    PlateBigText = record["PlateBigText"],
-                    Malicious = record["Malicious"].AsBool,
-                    Active = record["Active"].AsBool,
-                    TextActive = record["TextActive"].AsBool,
-                    BigTextActive = record["BigTextActive"].AsBool,
-                    Size = record["Size"],
-                    Tag = tagsList.ToArray()
-                });
+                    LogManager.LogErrorToConsole("Deserialized records list is null.");
+                    return;
+                }
+
+                var newTags = new Jsons.Json._Tags { records = records };
+                var newEntries = new List<(string uid, Jsons.Json.Tags entry)>(records.Count);
+
+                for (int i = 0; i < records.Count; i++)
+                {
+                    var entry = records[i];
+                    if (entry.Tag == null)
+                        entry.Tag = System.Array.Empty<string>();
+                    if (!string.IsNullOrEmpty(entry.UserID))
+                        newEntries.Add((entry.UserID, entry));
+                }
+
+                FewTags.s_tags = newTags;
+
+                _tagLookup.Clear();
+                for (int i = 0; i < newEntries.Count; i++)
+                    _tagLookup[newEntries[i].uid] = newEntries[i].entry;
+
+                _normalizedTagCache.Clear();
+
+                LogManager.LogToConsole($"Loaded {records.Count} records.");
+            }
+            catch (System.Exception ex)
+            {
+                LogManager.LogErrorToConsole($"LoadTags error: {ex.Message}");
             }
         }
 
@@ -326,6 +646,54 @@ namespace FewTags.FewTags
                 {
                     UpdatePlayerTags(vrcPlayer);
                 }
+            }
+        }
+
+        public static IEnumerator UpdateAllPlayersOnMainThread(bool forced = false)
+        {
+            yield return null;
+
+            var allplayers = Utils.AllPlayers;
+            if (allplayers == null || allplayers.Length == 0) yield break;
+
+            var snapshot = allplayers.ToArray();
+
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                var player = snapshot[i];
+                if (player == null) continue;
+
+                try
+                {
+                    var vrcPlayer = player?.gameObject?.GetComponent<VRC.Player>();
+                    if (vrcPlayer != null)
+                        UpdatePlayerTags(vrcPlayer, forced);
+                }
+                catch (Exception ex)
+                {
+                    LogManager.LogErrorToConsole($"Error updating tags for player in loop: {ex.Message}");
+                }
+
+                yield return null;
+            }
+        }
+
+        public static IEnumerator ReloadPlates()
+        {
+            yield return null;
+
+            var allplayers = Utils.AllPlayers;
+            if (allplayers == null || allplayers.Length == 0) yield break;
+
+            var snapshot = allplayers.ToArray();
+
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                var player = snapshot[i];
+                if (player == null) continue;
+                PlateHandlers.PlateHandler(player);
+
+                yield return null;
             }
         }
     }

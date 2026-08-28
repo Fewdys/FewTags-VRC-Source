@@ -27,7 +27,9 @@ namespace FewTags.FewTags
                         ["DisableBigPlates"] = false,
                         ["FewTagsEnabled"] = true,
                         ["NoHTMLForMain"] = false,
+                        ["SendTaggedIdiots"] = false,
                         ["LimitNewLineOrLength"] = false,
+                        ["DisableBackgrounds"] = false,
                         ["UnderNameplate"] = true,
                         ["MaxNewlinesPerPlate"] = 4,
                         ["MaxPlatesPerUser"] = 30,
@@ -59,6 +61,7 @@ namespace FewTags.FewTags
                 FewTags.DisableBigPlates = json["DisableBigPlates"].AsBool;
                 FewTags.FewTagsEnabled = json["FewTagsEnabled"].AsBool;
                 FewTags.LimitNewLineOrLength = json["LimitNewLineOrLength"].AsBool;
+                FewTags.DisableBackgrounds = json["DisableBackgrounds"].AsBool;
                 FewTags.UnderNameplate = json["UnderNameplate"].AsBool;
                 FewTags.MaxPlatesPerUser = json["MaxPlatesPerUser"].AsInt;
                 FewTags.MaxNewlinesPerPlate = json["MaxNewlinesPerPlate"].AsInt;
@@ -104,6 +107,7 @@ namespace FewTags.FewTags
                     ["FewTagsEnabled"] = FewTags.FewTagsEnabled,
                     ["NoHTMLForMain"] = FewTags.NoHTMLForMain,
                     ["LimitNewLineOrLength"] = FewTags.LimitNewLineOrLength,
+                    ["DisableBackgrounds"] = FewTags.DisableBackgrounds,
                     ["UnderNameplate"] = FewTags.UnderNameplate,
                     ["MaxNewlinesPerPlate"] = FewTags.MaxNewlinesPerPlate,
                     ["MaxPlatesPerUser"] = FewTags.MaxPlatesPerUser,

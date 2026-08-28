@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
@@ -7,32 +8,46 @@ namespace FewTags.FewTags
 {
     public class TagAnimator : MonoBehaviour
     {
-        private float rainbowTime = 0f;
-        private float smoothRainbowTime = 0f;
-        private float bounceTimer = 0f;
-        private int bounceIndex = 0;
+        private float rainbowTime;
+        private float smoothRainbowTime;
+
+        private float bounceTimer;
+        private int bounceIndex;
         private bool bounceForward = true;
-        private int letterIndex = 0;
+
+        private int letterIndex;
         private bool letterGoingForward = true;
-        private float letterTimer = 0f;
-        private float glitchTimer = 0f;
-        private float glitchOffset = 0f;
-        private int glitchCharIndex = 0;
+        private float letterTimer;
+
+        private float glitchTimer;
+        private float glitchOffset;
+        private int glitchCharIndex;
+
         public float ScrollSpeed = 8f;
-        private float scrollOffset = 0f;
+        private float scrollOffset;
 
-        private TextPart[] cachedParts = null;
-        private string cachedOriginalText = "";
-        private int cachedVisibleLength = -1;
+        public const int ScrollMaxWindowChars = 26;
 
+        public bool LetterByLetter = false;
+        public bool SmoothRainbow = false;
+        public bool Rainbow = false;
+        public bool Bounce = false;
+        public bool Jump = false;
+        public bool Pulse = false;
+        public bool Shake = false;
+        public bool GhostTrail = false;
+        public bool Blink = false;
+        public bool Glitch = false;
+        public bool Scroll = false;
 
-        public bool LetterByLetter = false, SmoothRainbow = false, Rainbow = false, Bounce = false, Jump = false, Pulse = false, Shake = false, GhostTrail = false, Blink = false, Glitch = false, Scroll = false;
         public string originalText = string.Empty;
 
         private const float RAINBOW_SPEED = 2.5f;
         private const float SMOOTH_RAINBOW_SPEED = 0.3125f;
+
         private const float BOUNCE_DELAY = 0.007f;
         private const float LETTER_DELAY = 0.45f;
+
         private const float JUMP_SPEED = 4f;
         private const float PULSE_SPEED = 4f;
         private const float SHAKE_SPEED = 30f;
@@ -41,396 +56,998 @@ namespace FewTags.FewTags
         private const float GLITCH_SPEED = 1.96f;
         private const float GLITCH_INTENSITY = 6.75f;
 
-        private static readonly Color32[] rainbowColors = new Color32[]
+        private const int ANIM_LBL = 0;
+        private const int ANIM_BOUNCE = 1;
+        private const int ANIM_RAINBOW = 2;
+        private const int ANIM_SMOOTH_RAINBOW = 3;
+        private const int ANIM_PULSE = 4;
+        private const int ANIM_JUMP = 5;
+        private const int ANIM_SHAKE = 6;
+        private const int ANIM_GHOST = 7;
+        private const int ANIM_BLINK = 8;
+        private const int ANIM_GLITCH = 9;
+        private const int ANIM_SCROLL = 10;
+
+        private int _renderAnimation = -1;
+
+        private bool _lastLetterByLetter;
+        private bool _lastSmoothRainbow;
+        private bool _lastRainbow;
+        private bool _lastBounce;
+        private bool _lastJump;
+        private bool _lastPulse;
+        private bool _lastShake;
+        private bool _lastGhostTrail;
+        private bool _lastBlink;
+        private bool _lastGlitch;
+        private bool _lastScroll;
+
+        private float _frameDeltaTime;
+        private float _frameTime;
+
+        private static readonly Color32[] rainbowColors =
         {
-            new Color32(255, 0, 0, 255),
-            new Color32(255, 127, 0, 255),
-            new Color32(255, 255, 0, 255),
-            new Color32(0, 255, 0, 255),
-            new Color32(0, 0, 255, 255),
-            new Color32(75, 0, 130, 255),
-            new Color32(148, 0, 211, 255),
+            new Color32(255,   0,   0, 255),
+            new Color32(255, 127,   0, 255),
+            new Color32(255, 255,   0, 255),
+            new Color32(  0, 255,   0, 255),
+            new Color32(  0,   0, 255, 255),
+            new Color32( 75,   0, 130, 255),
+            new Color32(148,   0, 211, 255)
         };
 
-        private float lastUpdateTime = 0f;
-        private const float UPDATE_INTERVAL = 0.004f;
-        private int updateCounter = 0;
-        private const int UPDATE_SKIP_THRESHOLD = 3;
+        private static readonly string[] rainbowHex =
+        {
+            "FF0000",
+            "FF7F00",
+            "FFFF00",
+            "00FF00",
+            "0000FF",
+            "4B0082",
+            "9400D3"
+        };
 
-        private static readonly Regex OpenSizeRegex = new Regex(@"<size=([+-]?\d+)%?>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex CloseSizeRegex = new Regex(@"</size>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex TagRegex = new Regex(@"<[^>]+>|[^<]+", RegexOptions.Compiled);
+        private static readonly char[] HexChars = "0123456789ABCDEF".ToCharArray();
 
+        private TextMeshProUGUI _cachedTMP;
+        private bool _tmpLookupFailed;
+
+        private readonly StringBuilder _sb = new StringBuilder(512);
+        private readonly Stack<string> _tagStack = new Stack<string>(8);
+        private readonly Stack<string> _openTags = new Stack<string>(8);
+        private readonly Stack<float> _sizeStack = new Stack<float>(4);
+        private readonly List<TagData> _activeTagsList = new List<TagData>(8);
+        private readonly Stack<TagData> _activeTagStack = new Stack<TagData>(8);
+        private readonly Stack<TagData> _tempTagStack = new Stack<TagData>(8);
+        private readonly Stack<string> _tempOpenStack = new Stack<string>(8);
+
+        private string _cachedStrippedText_LBL;
+        private string _cachedRaw_LBL;
+
+        private string _cachedStrippedText_CYLN;
+        private string _cachedRaw_CYLN;
+
+        private string _cachedStrippedText_RAIN;
+        private string _cachedRaw_RAIN;
+
+        private string _cachedStrippedText_SR;
+        private string _cachedRaw_SR;
+
+        private string _cachedStrippedText_PULSE;
+        private string _cachedRaw_PULSE;
+
+        private string _cachedStrippedText_JUMP;
+        private string _cachedRaw_JUMP;
+
+        private string _cachedStrippedText_SHAKE;
+        private string _cachedRaw_SHAKE;
+
+        private string _cachedStrippedText_GT;
+        private string _cachedRaw_GT;
+
+        private string _cachedStrippedText_BLINK;
+        private string _cachedRaw_BLINK;
+
+        private string _cachedStrippedText_GLITCH;
+        private string _cachedRaw_GLITCH;
+
+        private string _cachedStrippedText_SCROLL;
+        private string _cachedRaw_SCROLL;
+
+        private TextPart[] _partsLBL;
+        private string _partsRawLBL;
+        private int _lengthLBL;
+
+        private TextPart[] _partsCYLN;
+        private string _partsRawCYLN;
+        private int _lengthCYLN;
+
+        private TextPart[] _partsRAIN;
+        private string _partsRawRAIN;
+        private int _lengthRAIN;
+
+        private TextPart[] _partsSR;
+        private string _partsRawSR;
+        private int _lengthSR;
+
+        private TextPart[] _partsPULSE;
+        private string _partsRawPULSE;
+        private int _lengthPULSE;
+
+        private TextPart[] _partsJUMP;
+        private string _partsRawJUMP;
+        private int _lengthJUMP;
+
+        private TextPart[] _partsSHAKE;
+        private string _partsRawSHAKE;
+        private int _lengthSHAKE;
+
+        private TextPart[] _partsGT;
+        private string _partsRawGT;
+        private int _lengthGT;
+
+        private TextPart[] _partsBLINK;
+        private string _partsRawBLINK;
+        private int _lengthBLINK;
+
+        private TextPart[] _partsGLITCH;
+        private string _partsRawGLITCH;
+        private int _lengthGLITCH;
+
+        private TextPart[] _partsSCROLL;
+        private string _partsRawSCROLL;
+        private int _lengthSCROLL;
+
+        private List<string> _scrollCharList;
+        private string _scrollCachedText;
+        private int _scrollVisibleTotal;
+
+        private static readonly Regex OpenSizeRegex =
+            new Regex(
+                @"<size=([+-]?\d+)%?>",
+                RegexOptions.IgnoreCase |
+                RegexOptions.Compiled);
+
+        private static readonly Regex TagRegex =
+            new Regex(
+                @"<[^>]+>|[^<]+",
+                RegexOptions.Compiled);
+
+        private static readonly Regex ScrollCharRegex =
+            new Regex(
+                @"(<.*?>)|(.{1})",
+                RegexOptions.Singleline |
+                RegexOptions.Compiled);
+
+        private readonly System.Random _rng = new System.Random();
+
+        private string GetStripped(string raw, string marker, ref string cachedRaw, ref string cachedStripped, bool removeHtmlTags = false)
+        {
+            if (raw == cachedRaw && cachedStripped != null)
+            {
+                return cachedStripped;
+            }
+
+            cachedRaw = raw;
+
+            string result = raw.Replace(marker, "");
+
+            if (removeHtmlTags)
+            {
+                result = Utils.RemoveHtmlTags(result, true);
+            }
+
+            cachedStripped = result;
+
+            return result;
+        }
+
+        private TextPart[] GetCachedParts(string text, ref TextPart[] cache, ref string cachedText, ref int cachedLength)
+        {
+            if (text == cachedText && cache != null)
+            {
+                return cache;
+            }
+
+            cachedText = text;
+
+            cache = ParseTextWithTags(text);
+
+            cachedLength = 0;
+
+            for (int i = 0; i < cache.Length; i++)
+            {
+                if (!cache[i].IsStyled) cachedLength += cache[i].Length;
+            }
+
+            return cache;
+        }
+
+        private bool AnimationFlagsChanged()
+        {
+            return
+                _lastLetterByLetter != LetterByLetter ||
+                _lastSmoothRainbow != SmoothRainbow ||
+                _lastRainbow != Rainbow ||
+                _lastBounce != Bounce ||
+                _lastJump != Jump ||
+                _lastPulse != Pulse ||
+                _lastShake != Shake ||
+                _lastGhostTrail != GhostTrail ||
+                _lastBlink != Blink ||
+                _lastGlitch != Glitch ||
+                _lastScroll != Scroll;
+        }
+
+        private void RefreshRenderAnimation()
+        {
+            if (!AnimationFlagsChanged())
+                return;
+
+            _lastLetterByLetter = LetterByLetter;
+            _lastSmoothRainbow = SmoothRainbow;
+            _lastRainbow = Rainbow;
+            _lastBounce = Bounce;
+            _lastJump = Jump;
+            _lastPulse = Pulse;
+            _lastShake = Shake;
+            _lastGhostTrail = GhostTrail;
+            _lastBlink = Blink;
+            _lastGlitch = Glitch;
+            _lastScroll = Scroll;
+
+            if (Scroll)
+                _renderAnimation = ANIM_SCROLL;
+            else if (Glitch)
+                _renderAnimation = ANIM_GLITCH;
+            else if (Blink)
+                _renderAnimation = ANIM_BLINK;
+            else if (GhostTrail)
+                _renderAnimation = ANIM_GHOST;
+            else if (Shake)
+                _renderAnimation = ANIM_SHAKE;
+            else if (Jump)
+                _renderAnimation = ANIM_JUMP;
+            else if (Pulse)
+                _renderAnimation = ANIM_PULSE;
+            else if (SmoothRainbow)
+                _renderAnimation = ANIM_SMOOTH_RAINBOW;
+            else if (Rainbow)
+                _renderAnimation = ANIM_RAINBOW;
+            else if (Bounce)
+                _renderAnimation = ANIM_BOUNCE;
+            else if (LetterByLetter)
+                _renderAnimation = ANIM_LBL;
+            else
+                _renderAnimation = -1;
+        }
 
         public void ResetAnimator()
         {
+            _cachedTMP = null;
+            _tmpLookupFailed = false;
+
             LetterByLetter = false;
-            Bounce = false;
-            Rainbow = false;
             SmoothRainbow = false;
-            Pulse = false;
+            Rainbow = false;
+            Bounce = false;
             Jump = false;
+            Pulse = false;
             Shake = false;
             GhostTrail = false;
             Blink = false;
             Glitch = false;
             Scroll = false;
 
-            rainbowTime = 0;
-            smoothRainbowTime = 0;
-            bounceTimer = 0;
+            _lastLetterByLetter = false;
+            _lastSmoothRainbow = false;
+            _lastRainbow = false;
+            _lastBounce = false;
+            _lastJump = false;
+            _lastPulse = false;
+            _lastShake = false;
+            _lastGhostTrail = false;
+            _lastBlink = false;
+            _lastGlitch = false;
+            _lastScroll = false;
+
+            rainbowTime = 0f;
+            smoothRainbowTime = 0f;
+
+            bounceTimer = 0f;
             bounceIndex = 0;
             bounceForward = true;
+
             letterIndex = 0;
             letterGoingForward = true;
-            letterTimer = 0;
-            glitchTimer = 0;
-            glitchOffset = 0;
+            letterTimer = 0f;
+
+            glitchTimer = 0f;
+            glitchOffset = 0f;
             glitchCharIndex = 0;
-            updateCounter = 0;
-            lastUpdateTime = 0;
-            scrollOffset = 0;
+
+            scrollOffset = 0f;
+
+            _renderAnimation = -1;
+
+            _scrollCharList = null;
+            _scrollCachedText = null;
+            _scrollVisibleTotal = 0;
+
+            ClearParsedCaches();
         }
 
-        void Update()
+        private void ClearParsedCaches()
         {
-            if (Time.time - lastUpdateTime < UPDATE_INTERVAL) return;
-            lastUpdateTime = Time.time;
+            _partsLBL = null;
+            _partsRawLBL = null;
+            _lengthLBL = 0;
 
-            updateCounter++;
-            if (updateCounter % UPDATE_SKIP_THRESHOLD == 0) return;
+            _partsCYLN = null;
+            _partsRawCYLN = null;
+            _lengthCYLN = 0;
 
-            if (updateCounter > 500) updateCounter = 0;
+            _partsRAIN = null;
+            _partsRawRAIN = null;
+            _lengthRAIN = 0;
 
-            var textComponent = this.gameObject.transform.Find("Trust Text")?.GetComponent<TMPro.TextMeshProUGUI>();
-            if (textComponent == null) return;
+            _partsSR = null;
+            _partsRawSR = null;
+            _lengthSR = 0;
 
-            if (LetterByLetter)
-                LetterByLetterAnimation(textComponent, originalText.Replace(".LBL.", ""));
+            _partsPULSE = null;
+            _partsRawPULSE = null;
+            _lengthPULSE = 0;
 
-            if (Bounce)
-                BounceAnimation(textComponent, originalText.Replace(".CYLN.", ""));
+            _partsJUMP = null;
+            _partsRawJUMP = null;
+            _lengthJUMP = 0;
 
-            if (Rainbow)
-                RainbowAnimation(textComponent, Utils.RemoveHtmlTags(originalText, true).Replace(".RAIN.", ""));
+            _partsSHAKE = null;
+            _partsRawSHAKE = null;
+            _lengthSHAKE = 0;
 
-            if (SmoothRainbow)
-                SmoothRainbowAnimation(textComponent, Utils.RemoveHtmlTags(originalText, true).Replace(".SR.", ""));
+            _partsGT = null;
+            _partsRawGT = null;
+            _lengthGT = 0;
 
-            if (Pulse)
-                PopPulseAnimation(textComponent, originalText.Replace(".PULSE.", ""));
+            _partsBLINK = null;
+            _partsRawBLINK = null;
+            _lengthBLINK = 0;
 
-            if (Jump)
-                JumpAnimation(textComponent, originalText.Replace(".JUMP.", ""));
+            _partsGLITCH = null;
+            _partsRawGLITCH = null;
+            _lengthGLITCH = 0;
 
-            if (Shake)
-                ShakeAnimation(textComponent, originalText.Replace(".SHAKE.", ""));
-
-            if (GhostTrail)
-                GhostTrailAnimation(textComponent, originalText.Replace(".GT.", ""));
-
-            if (Blink)
-                BlinkAnimation(textComponent, Utils.RemoveHtmlTags(originalText.Replace(".BLINK.", ""), true));
-
-            if (Glitch)
-                GlitchAnimation(textComponent, originalText.Replace(".GLITCH.", ""));
-
-            if (Scroll)
-                ScrollAnimation(textComponent, originalText.Replace(".SCROLL.", ""));
+            _partsSCROLL = null;
+            _partsRawSCROLL = null;
+            _lengthSCROLL = 0;
         }
 
-        private static StringBuilder GetStringBuilder(int capacity = 256)
+        public void Start()
         {
-            return new StringBuilder(capacity);
         }
 
-        private TextPart[] GetCachedParts(string text)
+        public void Update()
         {
-            if (text != cachedOriginalText || cachedParts == null)
+            try
             {
-                cachedParts = ParseTextWithTags(text);
-                cachedOriginalText = text;
-                cachedVisibleLength = 0;
+                if (this == null)
+                    return;
 
-                for (int i = 0; i < cachedParts.Length; i++)
+                RefreshRenderAnimation();
+
+                if (_renderAnimation < 0)
+                    return;
+
+                if (_tmpLookupFailed)
+                    return;
+
+                if (_cachedTMP == null)
                 {
-                    if (!cachedParts[i].IsStyled)
-                        cachedVisibleLength += cachedParts[i].Text.Length;
+                    Transform textTransform = Utils.RecursiveFindChild(transform, "Trust Text", true, false);
+
+                    if (textTransform == null)
+                    {
+                        textTransform = Utils.RecursiveFindChild(transform, "Name", true, false);
+                    }
+
+                    try
+                    {
+                        _cachedTMP = textTransform?.GetComponent<TextMeshProUGUI>();
+                    }
+                    catch
+                    {
+                        _tmpLookupFailed = true;
+                        return;
+                    }
+
+                    if (_cachedTMP == null)
+                    {
+                        _tmpLookupFailed = true;
+                        return;
+                    }
+                }
+
+                TextMeshProUGUI textComponent = _cachedTMP;
+
+                if (textComponent == null)
+                {
+                    _cachedTMP = null;
+                    return;
+                }
+
+                string raw = originalText;
+
+                if (string.IsNullOrEmpty(raw))
+                    return;
+
+                _frameDeltaTime = Time.unscaledDeltaTime;
+
+                _frameTime = Time.unscaledTime;
+
+                switch (_renderAnimation)
+                {
+                    case ANIM_LBL:
+                        LetterByLetterAnimation(textComponent, GetStripped(raw, ".LBL.", ref _cachedRaw_LBL, ref _cachedStrippedText_LBL));
+                        break;
+
+                    case ANIM_BOUNCE:
+                        BounceAnimation(textComponent, GetStripped(raw, ".CYLN.", ref _cachedRaw_CYLN, ref _cachedStrippedText_CYLN));
+                        break;
+
+                    case ANIM_RAINBOW:
+                        RainbowAnimation(textComponent, GetStripped(raw, ".RAIN.", ref _cachedRaw_RAIN, ref _cachedStrippedText_RAIN, true));
+                        break;
+
+                    case ANIM_SMOOTH_RAINBOW:
+                        SmoothRainbowAnimation(textComponent, GetStripped(raw, ".SR.", ref _cachedRaw_SR, ref _cachedStrippedText_SR, true));
+                        break;
+
+                    case ANIM_PULSE:
+                        PopPulseAnimation(textComponent, GetStripped(raw, ".PULSE.", ref _cachedRaw_PULSE, ref _cachedStrippedText_PULSE));
+                        break;
+
+                    case ANIM_JUMP:
+                        JumpAnimation(textComponent, GetStripped(raw, ".JUMP.", ref _cachedRaw_JUMP, ref _cachedStrippedText_JUMP));
+                        break;
+
+                    case ANIM_SHAKE:
+                        ShakeAnimation(textComponent, GetStripped(raw, ".SHAKE.", ref _cachedRaw_SHAKE, ref _cachedStrippedText_SHAKE));
+                        break;
+
+                    case ANIM_GHOST:
+                        GhostTrailAnimation(textComponent, GetStripped(raw, ".GT.", ref _cachedRaw_GT, ref _cachedStrippedText_GT));
+                        break;
+
+                    case ANIM_BLINK:
+                        BlinkAnimation(textComponent, GetStripped(raw, ".BLINK.", ref _cachedRaw_BLINK, ref _cachedStrippedText_BLINK, true));
+                        break;
+
+                    case ANIM_GLITCH:
+                        GlitchAnimation(textComponent, GetStripped(raw, ".GLITCH.", ref _cachedRaw_GLITCH, ref _cachedStrippedText_GLITCH));
+                        break;
+
+                    case ANIM_SCROLL:
+                        ScrollAnimation(textComponent, GetStripped(raw, ".SCROLL.", ref _cachedRaw_SCROLL, ref _cachedStrippedText_SCROLL));
+                        break;
                 }
             }
+            catch (Exception e)
+            {
+                LogManager.LogErrorToConsole(
+                    "Failed To Update A Animated Plate!\n" +
+                    e);
+            }
+        }
 
-            return cachedParts;
+        private TextPart[] ParseTextWithTags(string text)
+        {
+            MatchCollection matches =
+                TagRegex.Matches(text);
+
+            int count =
+                matches.Count;
+
+            TextPart[] parts =
+                new TextPart[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                string value =
+                    matches[i].Value;
+
+                bool isStyled =
+                    value.Length >= 2 &&
+                    value[0] == '<' &&
+                    value[value.Length - 1] == '>';
+
+                TextPart part =
+                    new TextPart
+                    {
+                        Text = value,
+                        Length = value.Length,
+                        IsStyled = isStyled,
+                        IsClosingTag = isStyled && value.Length > 2 && value[1] == '/',
+                        SizeScale = 0f,
+                        CloseSizeCount = 0
+                    };
+
+                if (isStyled)
+                {
+                    Match openSize = OpenSizeRegex.Match(value);
+
+                    if (openSize.Success && float.TryParse(openSize.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float size))
+                    {
+                        part.SizeScale = size / 30f;
+                    }
+
+                    part.CloseSizeCount = CountOccurrences(value, "</size>");
+                }
+
+                parts[i] = part;
+            }
+
+            return parts;
+        }
+
+        private static int CountOccurrences(string source, string value)
+        {
+            if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(value))
+            {
+                return 0;
+            }
+
+            int count = 0;
+            int index = 0;
+
+            while ((index = source.IndexOf(value, index, StringComparison.OrdinalIgnoreCase)) >= 0)
+            {
+                count++;
+                index += value.Length;
+            }
+
+            return count;
         }
 
         private string BuildVisibleTextWithTags(TextPart[] parts, int visibleCharCount)
         {
             int capacity = visibleCharCount * 2 + parts.Length * 3;
-            StringBuilder sb = GetStringBuilder(capacity);
+
+            _sb.Clear();
+
+            if (_sb.Capacity < capacity)
+                _sb.EnsureCapacity(capacity);
 
             int writtenChars = 0;
-            Stack<string> tagStack = new Stack<string>();
+
+            _tagStack.Clear();
 
             for (int i = 0; i < parts.Length; i++)
             {
-                TextPart part = parts[i];
+                TextPart part =
+                    parts[i];
 
                 if (part.IsStyled)
                 {
-                    sb.Append(part.Text);
+                    _sb.Append(part.Text);
 
-                    if (!part.Text.StartsWith("</"))
+                    if (!part.IsClosingTag)
                     {
-                        tagStack.Push(ExtractTagName(part.Text));
+                        _tagStack.Push(
+                            ExtractTagName(
+                                part.Text));
                     }
-                    else if (tagStack.Count > 0)
+                    else if (_tagStack.Count > 0 && _tagStack.Peek() == ExtractTagName(part.Text))
                     {
-                        string tag = ExtractTagName(part.Text);
-                        if (tagStack.Peek() == tag)
-                            tagStack.Pop();
+                        _tagStack.Pop();
                     }
+
+                    continue;
                 }
-                else
-                {
-                    int remaining = visibleCharCount - writtenChars;
-                    if (remaining <= 0) break;
 
-                    int charsToWrite = Mathf.Min(part.Text.Length, remaining);
+                int remaining = visibleCharCount - writtenChars;
 
-                    for (int j = 0; j < charsToWrite; j++)
-                        sb.Append(part.Text[j]);
+                if (remaining <= 0)
+                    break;
 
-                    writtenChars += charsToWrite;
+                int charsToWrite = Mathf.Min(part.Length, remaining);
 
-                    if (charsToWrite < part.Text.Length)
-                        break;
-                }
+                _sb.Append(part.Text, 0, charsToWrite);
+
+                writtenChars += charsToWrite;
+
+                if (charsToWrite < part.Length)
+                    break;
             }
 
-            while (tagStack.Count > 0)
+            while (_tagStack.Count > 0)
             {
-                string tag = tagStack.Pop();
-                sb.Append("</");
-                sb.Append(tag);
-                sb.Append('>');
+                string tag = _tagStack.Pop();
+
+                _sb.Append("</");
+                _sb.Append(tag);
+                _sb.Append('>');
             }
 
-            return sb.ToString();
+            return _sb.ToString();
         }
 
-        private string ExtractTagName(string tag)
+        private static string ExtractTagName(string tag)
         {
-            int start = tag.IndexOf('<') + 1;
-            int end = tag.IndexOfAny(new char[] { ' ', '>', '\t' }, start);
-            if (end < 0) end = tag.Length - 1;
+            if (string.IsNullOrEmpty(tag))
+                return string.Empty;
 
-            if (tag[start] == '/')
+            int start = 1;
+
+            if (start < tag.Length && tag[start] == '/')
+            {
                 start++;
+            }
 
-            return tag.Substring(start, end - start).ToLower();
+            int end = start;
+
+            while (end < tag.Length)
+            {
+                char c = tag[end];
+
+                if (c == ' ' ||
+                    c == '>' ||
+                    c == '\t' ||
+                    c == '=')
+                {
+                    break;
+                }
+
+                end++;
+            }
+
+            if (end <= start)
+                return string.Empty;
+
+            return tag.Substring(start, end - start).ToLowerInvariant();
         }
 
-        internal void ScrollAnimation(TextMeshProUGUI textMeshPro, string originalText, int minWindowChars = 14, int maxWindowChars = 26)
+        internal void ScrollAnimation(TextMeshProUGUI textMeshPro, string text, int minWindowChars = 14, int maxWindowChars = ScrollMaxWindowChars)
         {
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
 
-            ///
-            /// IDK I GIVE UP, IF YOU USE COLOR TAGS IN UR TEXT JUST ENSURE TO MAKE THINGS WHITE FOR TEXT U WANT WHITE LOL
-            /// 
+            string textToScroll = text;
+            string prefix = string.Empty;
 
-            if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
-
-            string prefix = "";
-            string textToScroll = originalText.Replace(".SCROLL.", "");
-
-            // Handle [L] prefix
             if (textToScroll.StartsWith("[L]"))
             {
                 prefix = "[L] ";
+
                 textToScroll = textToScroll.Substring(4);
             }
 
-            if (!textToScroll.EndsWith(" ")) textToScroll += " ";
+            if (!textToScroll.EndsWith(" "))
+                textToScroll += " ";
 
-            var charList = new List<string>();
-            var regex = new Regex(@"(<.*?>)|(.{1})", RegexOptions.Singleline | RegexOptions.Compiled);
-            foreach (Match m in regex.Matches(textToScroll))
-                charList.Add(m.Value);
+            if (textToScroll != _scrollCachedText)
+            {
+                _scrollCachedText = textToScroll;
+
+                if (_scrollCharList == null)
+                {
+                    _scrollCharList = new List<string>(textToScroll.Length);
+                }
+                else
+                {
+                    _scrollCharList.Clear();
+                }
+
+                foreach (Match match in ScrollCharRegex.Matches(textToScroll))
+                {
+                    _scrollCharList.Add(match.Value);
+                }
+
+                _scrollVisibleTotal = 0;
+
+                for (int i = 0;
+                     i < _scrollCharList.Count;
+                     i++)
+                {
+                    string item = _scrollCharList[i];
+
+                    if (!IsTag(item))
+                        _scrollVisibleTotal++;
+                }
+
+                scrollOffset = 0f;
+            }
+
+            List<string> charList = _scrollCharList;
+
+            if (charList == null || charList.Count == 0)
+            {
+                return;
+            }
 
             int totalChars = charList.Count;
-            if (totalChars == 0) return;
-
-            int visibleCharTotal = 0;
-            foreach (var c in charList)
-                if (!(c.StartsWith("<") && c.EndsWith(">")))
-                    visibleCharTotal++;
 
             int targetWindowChars;
-            if (visibleCharTotal <= minWindowChars)
-                targetWindowChars = visibleCharTotal;
-            else if (visibleCharTotal <= maxWindowChars)
-                targetWindowChars = Mathf.Max(minWindowChars, Mathf.CeilToInt(visibleCharTotal * 0.7f));
-            else
-                targetWindowChars = maxWindowChars;
 
-            scrollOffset += Time.unscaledDeltaTime * ScrollSpeed;
+            if (_scrollVisibleTotal <= minWindowChars)
+            {
+                targetWindowChars = _scrollVisibleTotal;
+            }
+            else if (_scrollVisibleTotal <= maxWindowChars)
+            {
+                targetWindowChars = Mathf.Max(minWindowChars, Mathf.CeilToInt(_scrollVisibleTotal * 0.7f));
+            }
+            else
+            {
+                targetWindowChars = maxWindowChars;
+            }
+
+            scrollOffset += _frameDeltaTime * ScrollSpeed;
+
+            if (scrollOffset >= totalChars)
+            {
+                scrollOffset %= totalChars;
+            }
+
             int startIndex = Mathf.FloorToInt(scrollOffset) % totalChars;
 
             int windowSize = 0;
             int visibleCount = 0;
+
             for (int i = 0; i < totalChars; i++)
             {
                 int idx = (startIndex + i) % totalChars;
+
                 windowSize++;
-                if (!(charList[idx].StartsWith("<") && charList[idx].EndsWith(">")))
+
+                if (!IsTag(charList[idx]))
                 {
                     visibleCount++;
+
                     if (visibleCount >= targetWindowChars)
+                    {
                         break;
+                    }
                 }
             }
 
-            var activeTagStack = new Stack<(string tagName, string fullTag)>();
+            _activeTagStack.Clear();
+
             for (int i = 0; i < startIndex; i++)
             {
                 string item = charList[i];
-                if (item.StartsWith("<") && item.EndsWith(">"))
+
+                if (!IsTag(item))
+                    continue;
+
+                string tagName = ExtractTagName(item);
+
+                if (!item.StartsWith("</"))
                 {
-                    if (!item.StartsWith("</"))
-                    {
-                        string tagName = ExtractTagName(item);
-                        activeTagStack.Push((tagName, item));
-                    }
-                    else
-                    {
-                        string tagName = ExtractTagName(item);
-                        var temp = new Stack<(string, string)>();
-                        bool found = false;
-                        while (activeTagStack.Count > 0)
+                    _activeTagStack.Push(
+                        new TagData
                         {
-                            var top = activeTagStack.Pop();
-                            if (top.tagName == tagName && !found)
-                            {
-                                found = true;
-                                break;
-                            }
-                            temp.Push(top);
+                            TagName = tagName,
+                            FullTag = item
+                        });
+                }
+                else
+                {
+                    _tempTagStack.Clear();
+
+                    bool found = false;
+
+                    while (_activeTagStack.Count > 0)
+                    {
+                        TagData top = _activeTagStack.Pop();
+
+                        if (top.TagName ==
+                            tagName &&
+                            !found)
+                        {
+                            found = true;
+                            break;
                         }
-                        while (temp.Count > 0)
-                            activeTagStack.Push(temp.Pop());
+
+                        _tempTagStack.Push(top);
+                    }
+
+                    while (_tempTagStack.Count > 0)
+                    {
+                        _activeTagStack.Push(_tempTagStack.Pop());
                     }
                 }
             }
 
-            bool hasColorTag = charList.Any(c => c.StartsWith("<color=") || c.StartsWith("<color "));
-            bool insideColorAtStart = activeTagStack.Any(t => t.tagName == "color");
+            _sb.Clear();
 
-            var sb = new StringBuilder();
-            sb.Append(prefix);
+            _sb.Append(prefix);
 
-            if (!insideColorAtStart) sb.Append("<color=#ffffff>");
+            bool insideColorAtStart = false;
 
-            var openTags = new Stack<string>();
-            if (!insideColorAtStart)
-                openTags.Push("color");
-
-            var activeTagsList = activeTagStack.ToList();
-            activeTagsList.Reverse();
-            foreach (var tag in activeTagsList)
+            foreach (TagData tag in _activeTagStack)
             {
-                sb.Append(tag.fullTag);
-                openTags.Push(tag.tagName);
+                if (tag.TagName == "color")
+                {
+                    insideColorAtStart = true;
+                    break;
+                }
+            }
+
+            if (!insideColorAtStart)
+            {
+                _sb.Append("<color=#ffffff>");
+                _openTags.Clear();
+                _openTags.Push("color");
+            }
+            else
+            {
+                _openTags.Clear();
+            }
+
+            _activeTagsList.Clear();
+
+            foreach (TagData tag in _activeTagStack)
+                _activeTagsList.Add(tag);
+
+            for (int i =
+                     _activeTagsList.Count - 1;
+                 i >= 0;
+                 i--)
+            {
+                TagData activeTag =
+                    _activeTagsList[i];
+
+                _sb.Append(
+                    activeTag.FullTag);
+
+                _openTags.Push(
+                    activeTag.TagName);
             }
 
             for (int i = 0; i < windowSize; i++)
             {
                 int idx = (startIndex + i) % totalChars;
+
                 string item = charList[idx];
 
-                if (item.StartsWith("<") && item.EndsWith(">"))
+                if (!IsTag(item))
                 {
-                    if (!item.StartsWith("</"))
-                    {
-                        string tagName = ExtractTagName(item);
-                        sb.Append(item);
-                        openTags.Push(tagName);
-                    }
-                    else
-                    {
-                        string tagName = ExtractTagName(item);
-                        sb.Append(item);
+                    _sb.Append(item);
+                    continue;
+                }
 
-                        if (tagName == "color")
-                        {
-                            sb.Append("<color=#ffffff>");
-                            openTags.Push("color");
-                        }
+                if (!item.StartsWith("</"))
+                {
+                    _sb.Append(item);
 
-                        var temp = new Stack<string>();
-                        bool found = false;
-                        while (openTags.Count > 0)
-                        {
-                            var top = openTags.Pop();
-                            if (top == tagName && !found)
-                            {
-                                found = true;
-                                break;
-                            }
-                            temp.Push(top);
-                        }
-                        while (temp.Count > 0)
-                            openTags.Push(temp.Pop());
-                    }
+                    _openTags.Push(
+                        ExtractTagName(item));
                 }
                 else
                 {
-                    sb.Append(item);
+                    string tagName =
+                        ExtractTagName(item);
+
+                    _sb.Append(item);
+
+                    if (tagName == "color")
+                    {
+                        _sb.Append("<color=#ffffff>");
+                        _openTags.Push("color");
+                    }
+
+                    _tempOpenStack.Clear();
+
+                    bool found = false;
+
+                    while (_openTags.Count > 0)
+                    {
+                        string top =
+                            _openTags.Pop();
+
+                        if (top == tagName &&
+                            !found)
+                        {
+                            found = true;
+                            break;
+                        }
+
+                        _tempOpenStack.Push(top);
+                    }
+
+                    while (_tempOpenStack.Count > 0) _openTags.Push(_tempOpenStack.Pop());
                 }
             }
 
-            if (!openTags.Contains("color"))
+            bool hasColor = false;
+
+            foreach (string tag in _openTags)
             {
-                sb.Append("<color=#ffffff>");
-                openTags.Push("color");
+                if (tag == "color")
+                {
+                    hasColor = true;
+                    break;
+                }
             }
 
-            while (openTags.Count > 0)
+            if (!hasColor)
             {
-                string tagName = openTags.Pop();
-                sb.Append($"</{tagName}>");
+                _sb.Append("<color=#ffffff>");
+                _openTags.Push("color");
             }
 
-            textMeshPro.SetTextSafe(sb.ToString(), true, true);
+            while (_openTags.Count > 0)
+            {
+                string tagName =
+                    _openTags.Pop();
+
+                _sb.Append("</");
+                _sb.Append(tagName);
+                _sb.Append('>');
+            }
+
+            textMeshPro.SetTextSafe(
+                _sb.ToString(),
+                true,
+                true);
         }
 
-        internal void LetterByLetterAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        private static bool IsTag(string value)
         {
-            if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
+            return value.Length > 1 &&
+                   value[0] == '<' &&
+                   value[value.Length - 1] == '>';
+        }
 
-            string textForAnimation = originalText.Replace(".LBL.", "");
-            string prefix = "";
+        internal void LetterByLetterAnimation(TextMeshProUGUI textMeshPro, string text)
+        {
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            string textForAnimation = text;
+            string prefix = string.Empty;
 
             if (textForAnimation.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
+                textForAnimation =
+                    textForAnimation.Substring(4);
             }
 
-            letterTimer += Time.unscaledDeltaTime;
-            if (letterTimer < LETTER_DELAY) return;
+            letterTimer += _frameDeltaTime;
 
-            var parts = GetCachedParts(textForAnimation);
+            if (letterTimer < LETTER_DELAY)
+                return;
+
+            letterTimer -= LETTER_DELAY;
+
+            TextPart[] parts =
+                GetCachedParts(
+                    textForAnimation,
+                    ref _partsLBL,
+                    ref _partsRawLBL,
+                    ref _lengthLBL);
 
             if (letterGoingForward)
             {
                 letterIndex++;
-                if (letterIndex > cachedVisibleLength)
+
+                if (letterIndex > _lengthLBL)
                 {
-                    letterIndex = cachedVisibleLength;
+                    letterIndex = _lengthLBL;
                     letterGoingForward = false;
                 }
             }
             else
             {
                 letterIndex--;
+
                 if (letterIndex < 0)
                 {
                     letterIndex = 0;
@@ -439,286 +1056,383 @@ namespace FewTags.FewTags
             }
 
             string result = BuildVisibleTextWithTags(parts, letterIndex);
-            textMeshPro.SetTextSafe(prefix + result);
 
-            letterTimer = 0f;
+            _sb.Clear();
+            _sb.Append(prefix);
+            _sb.Append(result);
+
+            textMeshPro.SetTextSafe(
+                _sb.ToString());
         }
 
-        internal void JumpAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        internal void JumpAnimation(TextMeshProUGUI textMeshPro, string text)
         {
-            if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
 
-            string textForAnimation = originalText.Replace(".JUMP.", "");
-            string prefix = "";
+            string textForAnimation = text;
+            string prefix = string.Empty;
 
             if (textForAnimation.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
+                textForAnimation =
+                    textForAnimation.Substring(4);
             }
 
-            var parts = GetCachedParts(textForAnimation);
-            int estimatedCapacity = originalText.Length * 3;
-            var sb = GetStringBuilder(estimatedCapacity);
-            sb.Append(prefix);
+            TextPart[] parts = GetCachedParts(textForAnimation, ref _partsJUMP, ref _partsRawJUMP, ref _lengthJUMP);
+
+            _sb.Clear();
+
+            int requiredCapacity = text.Length * 3;
+
+            if (_sb.Capacity < requiredCapacity)
+                _sb.EnsureCapacity(requiredCapacity);
+
+            _sb.Append(prefix);
+
             int visibleCharIndex = 0;
-            float t = Time.time * JUMP_SPEED;
-            int mid = cachedVisibleLength / 2;
+
+            float t = _frameTime * JUMP_SPEED;
+
+            int mid = _lengthJUMP / 2;
 
             for (int p = 0; p < parts.Length; p++)
             {
                 TextPart part = parts[p];
-                if (part == null) continue;
 
                 if (part.IsStyled)
                 {
-                    sb.Append(part.Text);
+                    _sb.Append(part.Text);
                     continue;
                 }
 
-                for (int i = 0; i < part.Text.Length; i++)
+                for (int i = 0; i < part.Length; i++)
                 {
                     float offsetDistance = Mathf.Abs(visibleCharIndex - mid);
+
                     float voffset = Mathf.Sin(t - offsetDistance * 0.3f) * 6f;
 
-                    sb.Append("<voffset=");
-                    sb.Append(voffset.ToString("F1"));
-                    sb.Append("px>");
-                    sb.Append(part.Text[i]);
-                    sb.Append("</voffset>");
+                    _sb.Append("<voffset=");
+                    _sb.Append(voffset.ToString("F1", CultureInfo.InvariantCulture));
+                    _sb.Append("px>");
+                    _sb.Append(part.Text[i]);
+                    _sb.Append("</voffset>");
 
                     visibleCharIndex++;
                 }
             }
 
-            textMeshPro.SetTextSafe(sb.ToString());
+            textMeshPro.SetTextSafe(_sb.ToString(), true);
         }
 
-        internal void BlinkAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        internal void BlinkAnimation(TextMeshProUGUI textMeshPro, string text)
         {
-            if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
 
-            string textForAnimation = originalText.Replace(".BLINK.", "");
-            string prefix = "";
+            string textForAnimation = text;
+            string prefix = string.Empty;
 
             if (textForAnimation.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
+                textForAnimation = textForAnimation.Substring(4);
             }
 
-            float alpha = Mathf.Abs(Mathf.Sin(Time.time * BLINK_SPEED * Mathf.PI));
-            Color color = new Color(1f, 1f, 1f, alpha);
-            string hex = ColorToHex(color);
-            textMeshPro.SetTextSafe(prefix + $"<color=#{hex}>{textForAnimation}</color>");
+            float alpha = Mathf.Abs(Mathf.Sin(_frameTime * BLINK_SPEED * Mathf.PI));
+
+            _sb.Clear();
+
+            _sb.Append(prefix);
+            _sb.Append("<color=#");
+
+            AppendColorHex(_sb, new Color(1f, 1f, 1f, alpha));
+
+            _sb.Append('>');
+            _sb.Append(textForAnimation);
+            _sb.Append("</color>");
+
+            textMeshPro.SetTextSafe(_sb.ToString());
         }
 
-        internal void PopPulseAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        internal void PopPulseAnimation(TextMeshProUGUI textMeshPro, string text)
         {
-            if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
 
-            string textForAnimation = originalText.Replace(".PULSE.", "");
-            string prefix = "";
+            string textForAnimation = text;
+            string prefix = string.Empty;
 
             if (textForAnimation.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
+                textForAnimation = textForAnimation.Substring(4);
             }
 
-            var parts = GetCachedParts(textForAnimation);
-            int estimatedCapacity = originalText.Length * 3;
-            var sb = GetStringBuilder(estimatedCapacity);
-            sb.Append(prefix);
-            float t = Time.time * PULSE_SPEED;
+            TextPart[] parts = GetCachedParts(textForAnimation, ref _partsPULSE, ref _partsRawPULSE, ref _lengthPULSE);
+
+            _sb.Clear();
+
+            int requiredCapacity = text.Length * 3;
+
+            if (_sb.Capacity < requiredCapacity)
+                _sb.EnsureCapacity(requiredCapacity);
+
+            _sb.Append(prefix);
+
+            float t = _frameTime * PULSE_SPEED;
+
             int visibleCharIndex = 0;
 
-            Stack<float> sizeStack = new Stack<float>();
-            sizeStack.Push(1.0f);
+            _sizeStack.Clear();
+            _sizeStack.Push(1f);
 
             for (int p = 0; p < parts.Length; p++)
             {
                 TextPart part = parts[p];
-                if (part == null) continue;
 
                 if (part.IsStyled)
                 {
-                    foreach (Match openTag in OpenSizeRegex.Matches(part.Text))
+                    if (part.SizeScale > 0f)
+                        _sizeStack.Push(
+                            part.SizeScale);
+
+                    for (int i = 0;
+                         i < part.CloseSizeCount;
+                         i++)
                     {
-                        if (float.TryParse(openTag.Groups[1].Value, out float parsedSize))
-                            sizeStack.Push(parsedSize / 30);
+                        if (_sizeStack.Count > 1)
+                            _sizeStack.Pop();
                     }
 
-                    int closeTagCount = CloseSizeRegex.Matches(part.Text).Count;
-                    for (int i = 0; i < closeTagCount; i++)
-                    {
-                        if (sizeStack.Count > 1) // never pop default size
-                            sizeStack.Pop();
-                    }
-
-                    sb.Append(part.Text);
+                    _sb.Append(part.Text);
+                    continue;
                 }
-                else
-                {
-                    float currentBaseSize = sizeStack.Peek();
 
-                    for (int i = 0; i < part.Text.Length; i++)
-                    {
-                        float pulse = 1f + Mathf.Sin(t - visibleCharIndex * 0.3f) * 0.2f;
-                        float finalSize = currentBaseSize * pulse;
-                        sb.Append($"<size={(finalSize * 100):F0}%>{part.Text[i]}</size>");
-                        visibleCharIndex++;
-                    }
+                float baseSize = _sizeStack.Peek();
+
+                for (int i = 0; i < part.Length; i++)
+                {
+                    float pulse = 1f + Mathf.Sin(t - visibleCharIndex * 0.3f) * 0.2f;
+
+                    float finalSize = baseSize * pulse;
+
+                    _sb.Append("<size=");
+                    _sb.Append(((int)(finalSize * 100f)).ToString(CultureInfo.InvariantCulture));
+                    _sb.Append("%>");
+                    _sb.Append(part.Text[i]);
+                    _sb.Append("</size>");
+
+                    visibleCharIndex++;
                 }
             }
 
-            textMeshPro.SetTextSafe(sb.ToString());
+            textMeshPro.SetTextSafe(_sb.ToString());
         }
 
-
-        internal void ShakeAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        internal void ShakeAnimation(TextMeshProUGUI textMeshPro, string text)
         {
-            if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
 
-            string textForAnimation = originalText.Replace(".SHAKE.", "");
-            string prefix = "";
+            string textForAnimation = text;
+            string prefix = string.Empty;
 
             if (textForAnimation.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
+                textForAnimation = textForAnimation.Substring(4);
             }
 
-            var parts = GetCachedParts(textForAnimation);
-            int estimatedCapacity = originalText.Length * 3;
-            var sb = GetStringBuilder(estimatedCapacity);
-            sb.Append(prefix);
-            float t = Time.time * SHAKE_SPEED;
+            TextPart[] parts = GetCachedParts(textForAnimation, ref _partsSHAKE, ref _partsRawSHAKE, ref _lengthSHAKE);
+
+            _sb.Clear();
+
+            int requiredCapacity = text.Length * 3;
+
+            if (_sb.Capacity < requiredCapacity)
+                _sb.EnsureCapacity(requiredCapacity);
+
+            _sb.Append(prefix);
+
+            float t = _frameTime * SHAKE_SPEED;
+
             int visibleCharIndex = 0;
 
             for (int p = 0; p < parts.Length; p++)
             {
                 TextPart part = parts[p];
-                if (part == null) continue;
 
                 if (part.IsStyled)
                 {
-                    sb.Append(part.Text);
+                    _sb.Append(part.Text);
+                    continue;
                 }
-                else
+
+                for (int i = 0; i < part.Length; i++)
                 {
-                    for (int i = 0; i < part.Text.Length; i++)
-                    {
-                        float rot = Mathf.Sin(t * 0.1f + visibleCharIndex * 0.2f) * 20f;
-                        sb.Append($"<rotate={rot:F1}>{part.Text[i]}</rotate>");
-                        visibleCharIndex++;
-                    }
+                    float rot = Mathf.Sin(t * 0.1f + visibleCharIndex * 0.2f) * 20f;
+
+                    _sb.Append("<rotate=");
+                    _sb.Append(rot.ToString("F1", CultureInfo.InvariantCulture));
+                    _sb.Append('>');
+                    _sb.Append(part.Text[i]);
+                    _sb.Append("</rotate>");
+
+                    visibleCharIndex++;
                 }
             }
 
-            textMeshPro.SetTextSafe(sb.ToString());
+            textMeshPro.SetTextSafe(_sb.ToString());
         }
 
-        internal void GhostTrailAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        internal void GhostTrailAnimation(TextMeshProUGUI textMeshPro, string text)
         {
-            if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
 
-            string textForAnimation = originalText.Replace(".GT.", "");
-            string prefix = "";
+            string textForAnimation = text;
+            string prefix = string.Empty;
 
             if (textForAnimation.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
+                textForAnimation = textForAnimation.Substring(4);
             }
 
-            float t = Time.time * GHOST_SPEED;
-            int estimatedCapacity = originalText.Length * 4;
-            var sb = GetStringBuilder(estimatedCapacity);
-            var parts = GetCachedParts(textForAnimation);
-            sb.Append(prefix);
+            TextPart[] parts = GetCachedParts(textForAnimation, ref _partsGT, ref _partsRawGT, ref _lengthGT);
+
+            _sb.Clear();
+
+            int requiredCapacity = text.Length * 4;
+
+            if (_sb.Capacity < requiredCapacity)
+                _sb.EnsureCapacity(requiredCapacity);
+
+            _sb.Append(prefix);
+
+            float t = _frameTime * GHOST_SPEED;
+
             int visibleIndex = 0;
 
             for (int p = 0; p < parts.Length; p++)
             {
                 TextPart part = parts[p];
-                if (part == null) continue;
 
                 if (part.IsStyled)
                 {
-                    sb.Append(part.Text);
+                    _sb.Append(part.Text);
                     continue;
                 }
 
-                for (int i = 0; i < part.Text.Length; i++)
+                for (int i = 0; i < part.Length; i++)
                 {
                     float pulse = Mathf.Clamp01(Mathf.Sin(t - visibleIndex * 0.3f) * 0.5f + 0.5f);
-                    byte alpha = (byte)(pulse * 255f);
 
-                    sb.Append("<color=#FFFFFF");
-                    sb.Append(alpha.ToString("X2"));
-                    sb.Append('>');
-                    sb.Append(part.Text[i]);
-                    sb.Append("</color>");
+                    byte alpha =
+                        (byte)(pulse * 255f);
+
+                    _sb.Append("<color=#FFFFFF");
+                    _sb.Append(HexChars[alpha >> 4]);
+                    _sb.Append(HexChars[alpha & 0xF]);
+                    _sb.Append('>');
+                    _sb.Append(part.Text[i]);
+                    _sb.Append("</color>");
 
                     visibleIndex++;
                 }
             }
 
-            textMeshPro.SetTextSafe(sb.ToString());
+            textMeshPro.SetTextSafe(_sb.ToString());
         }
 
-        internal void BounceAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        internal void BounceAnimation(TextMeshProUGUI textMeshPro, string text)
         {
-            bounceTimer += Time.unscaledDeltaTime;
-            if (bounceTimer < BOUNCE_DELAY) return;
-            bounceTimer = 0f;
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
 
-            string textForAnimation = originalText.Replace(".CYLN.", "");
-            string prefix = "";
+            bounceTimer += _frameDeltaTime;
+
+            if (bounceTimer < BOUNCE_DELAY)
+                return;
+
+            bounceTimer -= BOUNCE_DELAY;
+
+            string textForAnimation = text;
+            string prefix = string.Empty;
 
             if (textForAnimation.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
+                textForAnimation = textForAnimation.Substring(4);
             }
 
-            var parts = GetCachedParts(textForAnimation);
-            int estimatedCapacity = originalText.Length * 2;
-            var sb = GetStringBuilder(estimatedCapacity);
-            sb.Append(prefix); // always prepend local tag
+            TextPart[] parts = GetCachedParts(textForAnimation, ref _partsCYLN, ref _partsRawCYLN, ref _lengthCYLN);
+
+            int visibleLength = _lengthCYLN;
+
+            if (visibleLength <= 0)
+                return;
+
+            _sb.Clear();
+
+            int requiredCapacity = text.Length * 2;
+
+            if (_sb.Capacity < requiredCapacity)
+                _sb.EnsureCapacity(requiredCapacity);
+
+            _sb.Append(prefix);
+
             int charIndex = 0;
-            string bounceRedHex = ColorUtility.ToHtmlStringRGB(Color.red);
 
             for (int p = 0; p < parts.Length; p++)
             {
                 TextPart part = parts[p];
-                if (part == null) continue;
 
                 if (part.IsStyled)
                 {
-                    sb.Append(part.Text);
+                    _sb.Append(part.Text);
+                    continue;
                 }
-                else
+
+                for (int j = 0; j < part.Length; j++)
                 {
-                    for (int j = 0; j < part.Text.Length; j++)
+                    if (charIndex == bounceIndex)
                     {
-                        if (charIndex == bounceIndex)
-                            sb.Append($"<color=#{bounceRedHex}>{part.Text[j]}</color>");
-                        else
-                            sb.Append(part.Text[j]);
-                        charIndex++;
+                        _sb.Append("<color=#FF0000>");
+                        _sb.Append(part.Text[j]);
+                        _sb.Append("</color>");
                     }
+                    else
+                    {
+                        _sb.Append(part.Text[j]);
+                    }
+
+                    charIndex++;
                 }
             }
 
-            textMeshPro.SetTextSafe(sb.ToString());
+            textMeshPro.SetTextSafe(_sb.ToString());
 
             bounceIndex += bounceForward ? 1 : -1;
 
-            if (bounceIndex >= cachedVisibleLength)
+            if (bounceIndex >= visibleLength)
             {
-                bounceIndex = cachedVisibleLength - 1;
+                bounceIndex = visibleLength - 1;
+
                 bounceForward = false;
             }
             else if (bounceIndex < 0)
@@ -728,141 +1442,185 @@ namespace FewTags.FewTags
             }
         }
 
-        internal void RainbowAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        internal void RainbowAnimation(TextMeshProUGUI textMeshPro, string text)
         {
-            if (textMeshPro == null) return;
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
 
-            string textForAnimation = originalText.Replace(".RAIN.", "");
-            string prefix = "";
+            string textForAnimation = text;
+            string prefix = string.Empty;
 
             if (textForAnimation.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
+                textForAnimation = textForAnimation.Substring(4);
             }
+
+            rainbowTime += _frameDeltaTime * RAINBOW_SPEED;
+
+            if (rainbowTime >= 1f)
+            {
+                rainbowTime -= Mathf.Floor(rainbowTime);
+            }
+
+            TextPart[] parts = GetCachedParts(textForAnimation, ref _partsRAIN, ref _partsRawRAIN, ref _lengthRAIN);
 
             int colorCount = rainbowColors.Length;
-            rainbowTime += Time.unscaledDeltaTime * RAINBOW_SPEED;
-            rainbowTime %= 1.0f;
 
-            int estimatedCapacity = originalText.Length * 3;
-            var sb = GetStringBuilder(estimatedCapacity);
-            var parts = GetCachedParts(textForAnimation);
-            sb.Append(prefix);
+            int colorOffset = Mathf.FloorToInt(rainbowTime * colorCount);
 
-            for (int p = 0; p < parts.Length; p++)
-            {
-                TextPart part = parts[p];
-                if (part == null) continue;
+            _sb.Clear();
 
-                if (part.IsStyled)
-                {
-                    sb.Append(part.Text);
-                }
-                else
-                {
-                    for (int i = 0; i < part.Text.Length; i++)
-                    {
-                        int colorIndex = (i + Mathf.FloorToInt(rainbowTime * colorCount)) % colorCount;
-                        Color32 color = rainbowColors[colorIndex];
-                        sb.Append($"<color=#{ColorUtility.ToHtmlStringRGB(color)}>{part.Text[i]}</color>");
-                    }
-                }
-            }
+            int requiredCapacity = text.Length * 3;
 
-            textMeshPro.SetTextSafe(sb.ToString());
-        }
+            if (_sb.Capacity < requiredCapacity)
+                _sb.EnsureCapacity(requiredCapacity);
 
-        internal void SmoothRainbowAnimation(TextMeshProUGUI textMeshPro, string originalText)
-        {
-            if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
-
-            string textForAnimation = originalText.Replace(".SR.", "");
-            string prefix = "";
-
-            if (textForAnimation.StartsWith("[L]"))
-            {
-                prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
-            }
-
-            smoothRainbowTime += Time.unscaledDeltaTime * SMOOTH_RAINBOW_SPEED;
-            smoothRainbowTime %= 1f;
-
-            int estimatedCapacity = originalText.Length * 3;
-            var sb = GetStringBuilder(estimatedCapacity);
-            var parts = GetCachedParts(textForAnimation);
-            sb.Append(prefix);
+            _sb.Append(prefix);
 
             for (int p = 0; p < parts.Length; p++)
             {
                 TextPart part = parts[p];
-                if (part == null) continue;
 
                 if (part.IsStyled)
                 {
-                    sb.Append(part.Text);
+                    _sb.Append(part.Text);
+                    continue;
                 }
-                else
-                {
-                    int len = Mathf.Max(1, part.Text.Length);
 
-                    for (int i = 0; i < part.Text.Length; i++)
-                    {
-                        float hue = Mathf.Repeat(smoothRainbowTime + (float)i / len, 1f);
-                        Color color = Color.HSVToRGB(hue, 1f, 1f);
-                        string hex = ColorToHex(color);
-                        sb.Append($"<color=#{hex}>{part.Text[i]}</color>");
-                    }
+                for (int i = 0; i < part.Length; i++)
+                {
+                    int colorIndex = (i + colorOffset) % colorCount;
+
+                    _sb.Append("<color=#");
+                    _sb.Append(rainbowHex[colorIndex]);
+                    _sb.Append('>');
+                    _sb.Append(part.Text[i]);
+                    _sb.Append("</color>");
                 }
             }
 
-            textMeshPro.SetTextSafe(sb.ToString());
+            textMeshPro.SetTextSafe(_sb.ToString());
         }
 
-        internal void GlitchAnimation(TextMeshProUGUI textMeshPro, string originalText)
+        internal void SmoothRainbowAnimation(TextMeshProUGUI textMeshPro, string text)
         {
-            if (textMeshPro == null || string.IsNullOrEmpty(originalText)) return;
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
 
-            if (updateCounter % 4 == 0) return;
-
-            string textForAnimation = originalText.Replace(".GLITCH.", "");
-            string prefix = "";
+            string textForAnimation = text;
+            string prefix = string.Empty;
 
             if (textForAnimation.StartsWith("[L]"))
             {
                 prefix = "[L] ";
-                textForAnimation = textForAnimation.Substring(4); // remove "[L] " from animated portion
+                textForAnimation = textForAnimation.Substring(4);
             }
 
-            glitchTimer += Time.unscaledDeltaTime * GLITCH_SPEED;
+            smoothRainbowTime += _frameDeltaTime * SMOOTH_RAINBOW_SPEED;
 
-            var parts = GetCachedParts(textForAnimation);
-            int estimatedCapacity = originalText.Length * 6;
-            var sb = GetStringBuilder(estimatedCapacity);
-            sb.Append(prefix);
-            int visibleCharIndex = 0;
+            if (smoothRainbowTime >= 1f)
+            {
+                smoothRainbowTime -= Mathf.Floor(smoothRainbowTime);
+            }
+
+            TextPart[] parts = GetCachedParts(textForAnimation, ref _partsSR, ref _partsRawSR, ref _lengthSR);
+
+            _sb.Clear();
+
+            int requiredCapacity = text.Length * 3;
+
+            if (_sb.Capacity < requiredCapacity)
+                _sb.EnsureCapacity(requiredCapacity);
+
+            _sb.Append(prefix);
+
+            for (int p = 0; p < parts.Length; p++)
+            {
+                TextPart part = parts[p];
+
+                if (part.IsStyled)
+                {
+                    _sb.Append(part.Text);
+                    continue;
+                }
+
+                int len = Mathf.Max(1, part.Length);
+
+                for (int i = 0; i < part.Length; i++)
+                {
+                    float hue = Mathf.Repeat(smoothRainbowTime + (float)i / len, 1f);
+
+                    Color color = Color.HSVToRGB(hue, 1f, 1f);
+
+                    _sb.Append("<color=#");
+
+                    AppendColorHex(_sb, color);
+
+                    _sb.Append('>');
+                    _sb.Append(part.Text[i]);
+                    _sb.Append("</color>");
+                }
+            }
+
+            textMeshPro.SetTextSafe(_sb.ToString());
+        }
+
+        internal void GlitchAnimation(TextMeshProUGUI textMeshPro, string text)
+        {
+            if (textMeshPro == null || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            string textForAnimation = text;
+            string prefix = string.Empty;
+
+            if (textForAnimation.StartsWith("[L]"))
+            {
+                prefix = "[L] ";
+                textForAnimation = textForAnimation.Substring(4);
+            }
+
+            glitchTimer += _frameDeltaTime * GLITCH_SPEED;
+
+            TextPart[] parts = GetCachedParts(textForAnimation, ref _partsGLITCH, ref _partsRawGLITCH, ref _lengthGLITCH);
 
             float glitchNoise = Mathf.PerlinNoise(glitchTimer * 0.5f, 0f);
+
             float glitchNoise2 = Mathf.PerlinNoise(glitchTimer * 0.7f, 100f);
+
             float glitchNoise3 = Mathf.PerlinNoise(glitchTimer * 0.3f, 200f);
 
             bool shouldGlitch = glitchNoise > 0.3f;
+
             bool shouldCorrupt = glitchNoise2 > 0.6f;
+
             bool shouldShift = glitchNoise3 > 0.4f;
+
             bool shouldFlicker = glitchNoise > 0.5f;
+
             bool shouldBold = glitchNoise2 > 0.7f;
+
             bool shouldRotate = glitchNoise3 > 0.6f;
+
             bool shouldSize = glitchNoise > 0.65f;
 
-            float random1 = UnityEngine.Random.Range(0f, 1f);
-            float random2 = UnityEngine.Random.Range(0f, 1f);
-            float random3 = UnityEngine.Random.Range(0f, 1f);
-            float random4 = UnityEngine.Random.Range(0f, 1f);
+            float random1 = (float)_rng.NextDouble();
 
-            if (shouldCorrupt)
+            float random2 = (float)_rng.NextDouble();
+
+            float random3 = (float)_rng.NextDouble();
+
+            float random4 = (float)_rng.NextDouble();
+
+            if (_lengthGLITCH > 0 && shouldCorrupt)
             {
-                glitchCharIndex = (glitchCharIndex + 1) % Mathf.Max(1, cachedVisibleLength);
+                glitchCharIndex = (glitchCharIndex + 1) % _lengthGLITCH;
             }
 
             if (shouldShift)
@@ -871,180 +1629,238 @@ namespace FewTags.FewTags
             }
             else
             {
-                glitchOffset = Mathf.Lerp(glitchOffset, 0f, Time.unscaledDeltaTime * 8f);
+                glitchOffset = Mathf.Lerp(glitchOffset, 0f, _frameDeltaTime * 8f);
             }
+
+            const string corruptChars = "!@#$%^&*()_+-=[]{}|;':\",./<>?~`";
+
+            const string glitchChars = "0123456789ABCDEF!@#$%^&*()_+-=[]{}|;':\",./<>?~`";
+
+            _sb.Clear();
+
+            int requiredCapacity = text.Length * 6;
+
+            if (_sb.Capacity < requiredCapacity)
+                _sb.EnsureCapacity(requiredCapacity);
+
+            _sb.Append(prefix);
+
+            int visibleCharIndex = 0;
 
             for (int p = 0; p < parts.Length; p++)
             {
                 TextPart part = parts[p];
-                if (part == null) continue;
 
                 if (part.IsStyled)
                 {
-                    sb.Append(part.Text);
+                    _sb.Append(part.Text);
+                    continue;
                 }
-                else
+
+                for (int i = 0; i < part.Length; i++)
                 {
-                    for (int i = 0; i < part.Text.Length; i++)
+                    char currentChar = part.Text[i];
+
+                    bool hasColorTag = false;
+                    bool hasPositionTag = false;
+                    bool hasRotationTag = false;
+                    bool hasSizeTag = false;
+                    bool hasBoldTag = false;
+
+                    float charRandom = (random1 + visibleCharIndex * 0.10f) % 1f;
+
+                    float charRandom2 = (random2 + visibleCharIndex * 0.15f) % 1f;
+
+                    float charRandom3 = (random3 + visibleCharIndex * 0.20f) % 1f;
+
+                    float charRandom4 = (random4 + visibleCharIndex * 0.25f) % 1f;
+
+                    if (shouldCorrupt && visibleCharIndex == glitchCharIndex)
                     {
-                        char currentChar = part.Text[i];
-                        bool hasColorTag = false;
-                        bool hasPositionTag = false;
-                        bool hasRotationTag = false;
-                        bool hasSizeTag = false;
-                        bool hasBoldTag = false;
-
-                        float charRandom = (random1 + visibleCharIndex * 0.1f) % 1f;
-                        float charRandom2 = (random2 + visibleCharIndex * 0.15f) % 1f;
-                        float charRandom3 = (random3 + visibleCharIndex * 0.2f) % 1f;
-                        float charRandom4 = (random4 + visibleCharIndex * 0.25f) % 1f;
-
-                        if (shouldCorrupt && visibleCharIndex == glitchCharIndex)
-                        {
-                            string glitchChars = "!@#$%^&*()_+-=[]{}|;':\",./<>?~`";
-                            currentChar = glitchChars[Mathf.FloorToInt(glitchTimer * 15f) % glitchChars.Length];
-                        }
-
-                        if (shouldGlitch && charRandom < 0.25f)
-                        {
-                            string glitchChars = "0123456789ABCDEF!@#$%^&*()_+-=[]{}|;':\",./<>?~`";
-                            currentChar = glitchChars[Mathf.FloorToInt(charRandom * glitchChars.Length)];
-                        }
-
-                        if (shouldCorrupt && visibleCharIndex == glitchCharIndex)
-                        {
-                            Color glitchColor = new Color(
-                                0.5f + charRandom * 0.5f,
-                                charRandom2 * 0.5f,
-                                0.5f + charRandom3 * 0.5f,
-                                1f
-                            );
-                            string hex = ColorToHex(glitchColor);
-                            sb.Append($"<color=#{hex}>");
-                            hasColorTag = true;
-                        }
-                        else if (shouldGlitch && charRandom < 0.4f)
-                        {
-                            Color glitchColor = new Color(
-                                0.8f + charRandom * 0.2f,
-                                charRandom2 * 0.2f,
-                                0.8f + charRandom3 * 0.2f,
-                                1f
-                            );
-                            string hex = ColorToHex(glitchColor);
-                            sb.Append($"<color=#{hex}>");
-                            hasColorTag = true;
-                        }
-
-                        if (shouldShift || (Mathf.Abs(glitchOffset) > 0.1f))
-                        {
-                            float yOffset = Mathf.Cos(visibleCharIndex * 0.3f + glitchTimer * 1.5f) * glitchOffset * 0.3f;
-                            sb.Append($"<voffset={yOffset:F1}px>");
-                            hasPositionTag = true;
-                        }
-
-                        if (shouldRotate || (shouldGlitch && charRandom2 < 0.3f))
-                        {
-                            float rotation = -45f + charRandom * 90f;
-                            sb.Append($"<rotate={rotation:F1}>");
-                            hasRotationTag = true;
-                        }
-
-                        if (shouldSize || (shouldGlitch && charRandom3 < 0.25f))
-                        {
-                            float size = 0.5f + charRandom * 1.5f;
-                            sb.Append($"<size={(size * 100):F0}%>");
-                            hasSizeTag = true;
-                        }
-
-                        if (shouldFlicker || (shouldGlitch && charRandom4 < 0.35f))
-                        {
-                            float alpha = 0.2f + charRandom * 0.8f;
-                            Color alphaColor = new Color(1f, 1f, 1f, alpha);
-                            string hex = ColorToHex(alphaColor);
-                            sb.Append($"<color=#{hex}>");
-                            hasColorTag = true;
-                        }
-
-                        if (shouldBold || (shouldGlitch && charRandom < 0.2f))
-                        {
-                            sb.Append("<b>");
-                            hasBoldTag = true;
-                        }
-
-                        sb.Append(currentChar);
-
-                        if (hasSizeTag)
-                        {
-                            sb.Append("</size>");
-                        }
-                        if (hasRotationTag)
-                        {
-                            sb.Append("</rotate>");
-                        }
-                        if (hasPositionTag)
-                        {
-                            sb.Append("</voffset>");
-                        }
-                        if (hasBoldTag)
-                        {
-                            sb.Append("</b>");
-                        }
-                        if (hasColorTag)
-                        {
-                            sb.Append("</color>");
-                        }
-
-                        visibleCharIndex++;
+                        currentChar = corruptChars[Mathf.FloorToInt(glitchTimer * 15f) % corruptChars.Length];
                     }
+                    else if (shouldGlitch && charRandom < 0.25f)
+                    {
+                        currentChar = glitchChars[Mathf.FloorToInt(charRandom * glitchChars.Length)];
+                    }
+
+                    if (shouldCorrupt && visibleCharIndex == glitchCharIndex)
+                    {
+                        Color gc = new Color(0.5f + charRandom * 0.5f, charRandom2 * 0.5f, 0.5f + charRandom3 * 0.5f, 1f);
+
+                        _sb.Append("<color=#");
+                        AppendColorHex(_sb, gc);
+                        _sb.Append('>');
+
+                        hasColorTag = true;
+                    }
+                    else if (shouldGlitch && charRandom < 0.4f)
+                    {
+                        Color gc = new Color(0.8f + charRandom * 0.2f, charRandom2 * 0.2f, 0.8f + charRandom3 * 0.2f, 1f);
+
+                        _sb.Append("<color=#");
+                        AppendColorHex(_sb, gc);
+                        _sb.Append('>');
+
+                        hasColorTag = true;
+                    }
+
+                    if (shouldShift ||
+                        Mathf.Abs(glitchOffset) > 0.1f)
+                    {
+                        float yOffset = Mathf.Cos(visibleCharIndex * 0.3f + glitchTimer * 1.5f) * glitchOffset * 0.3f;
+
+                        _sb.Append("<voffset=");
+                        _sb.Append(yOffset.ToString("F1", CultureInfo.InvariantCulture));
+                        _sb.Append("px>");
+
+                        hasPositionTag = true;
+                    }
+
+                    if (shouldRotate || (shouldGlitch && charRandom2 < 0.3f))
+                    {
+                        float rotation = -45f + charRandom * 90f;
+
+                        _sb.Append("<rotate=");
+                        _sb.Append(rotation.ToString("F1", CultureInfo.InvariantCulture));
+                        _sb.Append('>');
+
+                        hasRotationTag = true;
+                    }
+
+                    if (shouldSize || (shouldGlitch && charRandom3 < 0.25f))
+                    {
+                        float size = 0.5f + charRandom * 1.5f;
+
+                        _sb.Append("<size=");
+                        _sb.Append(((int)(size * 100f)).ToString(CultureInfo.InvariantCulture));
+                        _sb.Append("%>");
+
+                        hasSizeTag = true;
+                    }
+
+                    if (shouldFlicker || (shouldGlitch && charRandom4 < 0.35f))
+                    {
+                        float al = 0.2f + charRandom * 0.8f;
+
+                        _sb.Append("<color=#");
+
+                        AppendColorHex(_sb, new Color(1f, 1f, 1f, al));
+
+                        _sb.Append('>');
+
+                        hasColorTag = true;
+                    }
+
+                    if (shouldBold || (shouldGlitch && charRandom < 0.2f))
+                    {
+                        _sb.Append("<b>");
+                        hasBoldTag = true;
+                    }
+
+                    _sb.Append(currentChar);
+
+                    if (hasSizeTag)
+                        _sb.Append("</size>");
+
+                    if (hasRotationTag)
+                        _sb.Append("</rotate>");
+
+                    if (hasPositionTag)
+                        _sb.Append("</voffset>");
+
+                    if (hasBoldTag)
+                        _sb.Append("</b>");
+
+                    if (hasColorTag)
+                        _sb.Append("</color>");
+
+                    visibleCharIndex++;
                 }
             }
 
-            textMeshPro.SetTextSafe(sb.ToString());
+            textMeshPro.SetTextSafe(_sb.ToString());
         }
 
-        private string ColorToHex(Color color)
+        private static void AppendColorHex(
+            StringBuilder sb,
+            Color color)
         {
-            byte r = (byte)(Mathf.Clamp01(color.r) * 255f);
-            byte g = (byte)(Mathf.Clamp01(color.g) * 255f);
-            byte b = (byte)(Mathf.Clamp01(color.b) * 255f);
-            byte a = (byte)(Mathf.Clamp01(color.a) * 255f);
-            return $"{r:X2}{g:X2}{b:X2}{a:X2}";
+            byte r =
+                (byte)(
+                    Mathf.Clamp01(color.r) *
+                    255f);
+
+            byte g =
+                (byte)(
+                    Mathf.Clamp01(color.g) *
+                    255f);
+
+            byte b =
+                (byte)(
+                    Mathf.Clamp01(color.b) *
+                    255f);
+
+            byte a =
+                (byte)(
+                    Mathf.Clamp01(color.a) *
+                    255f);
+
+            sb.Append(HexChars[r >> 4]);
+            sb.Append(HexChars[r & 0xF]);
+
+            sb.Append(HexChars[g >> 4]);
+            sb.Append(HexChars[g & 0xF]);
+
+            sb.Append(HexChars[b >> 4]);
+            sb.Append(HexChars[b & 0xF]);
+
+            sb.Append(HexChars[a >> 4]);
+            sb.Append(HexChars[a & 0xF]);
         }
 
-        private TextPart[] ParseTextWithTags(string text)
+        private struct TextPart
         {
-            var matches = TagRegex.Matches(text);
-            int count = matches.Count;
-            TextPart[] parts = new TextPart[count];
+            public string Text;
+            public int Length;
+            public bool IsStyled;
+            public bool IsClosingTag;
 
-            for (int i = 0; i < count; i++)
-            {
-                string value = matches[i].Value;
-                parts[i] = new TextPart
-                {
-                    Text = value,
-                    IsStyled = value.StartsWith("<") && value.EndsWith(">")
-                };
-            }
-
-            return parts;
+            public float SizeScale;
+            public int CloseSizeCount;
         }
 
-        private class TextPart
+        private struct TagData
         {
-            public string Text { get; set; }
-            public bool IsStyled { get; set; }
+            public string TagName;
+            public string FullTag;
         }
 
-        void OnDestroy()
+        public void OnDestroy()
         {
-            cachedParts = null;
-            cachedOriginalText = "";
-            cachedVisibleLength = -1;
-            lastUpdateTime = 0;
-            updateCounter = 0;
+            _cachedTMP = null;
+            _tmpLookupFailed = false;
+
             originalText = string.Empty;
+
+            _renderAnimation = -1;
+
+            _scrollCharList = null;
+            _scrollCachedText = null;
+            _scrollVisibleTotal = 0;
+
+            ClearParsedCaches();
+
+            _sb.Clear();
+
+            _tagStack.Clear();
+            _openTags.Clear();
+            _sizeStack.Clear();
+
+            _activeTagsList.Clear();
+            _activeTagStack.Clear();
+            _tempTagStack.Clear();
+            _tempOpenStack.Clear();
         }
     }
 }

@@ -40,8 +40,8 @@ namespace FewTags.FewTags
 
             OnPlayer.PatchOnPlayer();
             FewTagsConfigLoader.Load();
-            FewTagsUpdater.UpdateTagsAsync();
             LocalTags.LoadLocalTags();
+            FewTagsUpdater.StartBackgroundPoller();
             // add you're logic
 
             //FewTagsUpdater.DoUpdate(); // add this to either to the update of a monobehaviour or you're OnUpdate loop
@@ -66,8 +66,8 @@ namespace FewTags.FewTags
 
             OnPlayer.PatchOnPlayer();
             FewTagsConfigLoader.Load();
-            FewTagsUpdater.UpdateTagsAsync();
             LocalTags.LoadLocalTags();
+            FewTagsUpdater.StartBackgroundPoller();
 
             //FewTagsUpdater.DoUpdate(); // add this to either to the update of a monobehaviour or you're OnUpdate loop
             //PlateFunctions.WorldChangeCall(); // add this to scene change method call as needed

@@ -1,13 +1,17 @@
-﻿using UnityEngine;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using FewTags.FewTags;
+using TMPro;
+using UnityEngine;
 using UnityEngine.UI;
+using VRC.UI.Elements;
 
-namespace FewTags.FewTags
+namespace Nyup_FewTags._Plate
 {
     internal class PlateFunctions
     {
-        private static GameObject qm;
-        private static GameObject bm;
-        private static GameObject kb;
+        private static Dictionary<string, GraphicRaycaster> raycasterMap;
         private static GraphicRaycaster qmRaycaster;
         private static GraphicRaycaster bmRaycaster;
         private static GraphicRaycaster kbRaycaster;
@@ -24,89 +28,117 @@ namespace FewTags.FewTags
         /// <summary>
         /// Clears or Removes All Plates From All Players That Have Plates.
         /// </summary>
-        internal static void ClearAllPlates() // commented out code can cause issues depening on you're loader / build feel free to leave commented or try with uncommented (in reality shouldn't make a difference)
+        internal static void ClearAllPlates()
         {
-            /*var keys1 = FewTags.playerPlates.Keys.ToArray();
-            for (int i = 0; i < keys1.Length; i++)
-            {
-                var key = keys1[i];
-                var plates = FewTags.playerPlates[key];
-                for (int j = 0; j < plates.Count; j++)
-                {
-                    plates[j]?.Cleanup();
-                }
-            }*/
-            FewTags.playerPlates.Clear();
-
-            /*var keys2 = FewTags.playerStaticPlates.Keys.ToArray();
-            for (int i = 0; i < keys2.Length; i++)
-            {
-                var key = keys2[i];
-                var plates = FewTags.playerStaticPlates[key];
-                for (int j = 0; j < plates.Count; j++)
-                {
-                    plates[j]?.Cleanup();
-                }
-            }*/
-            FewTags.playerStaticPlates.Clear();
+            FewTags.FewTags.FewTags.playerPlates.Clear();
+            FewTags.FewTags.FewTags.playerStaticPlates.Clear();
         }
 
         /// <summary>
         /// Clears or Removes All Plates From UserID Entered If They Have Plates.
         /// </summary>
-        internal static void ClearPlatesForPlayer(string uid)
+        internal static void ClearPlatesForPlayer(string uid, bool Destroy = true)
         {
-            if (string.IsNullOrEmpty(uid)) return;
+            if (string.IsNullOrWhiteSpace(uid))
+                return;
 
-            if (FewTags.playerPlates.TryGetValue(uid, out var oldPlates))
+            // ---- Dynamic plates ----
+            var platesDict = FewTags.FewTags.FewTags.playerPlates;
+            if (platesDict != null && platesDict.Count > 0)
             {
-                for (int i = 0; i < oldPlates.Count; i++)
+                if (platesDict.TryRemove(uid, out var oldPlates) && oldPlates != null)
                 {
-                    oldPlates[i]?.Cleanup();
+                    foreach (var plate in oldPlates)
+                    {
+                        if (plate == null) continue;
+                        try
+                        {
+                            if (Destroy && plate._gameObject != null)
+                                UnityEngine.Object.Destroy(plate._gameObject);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.LogErrorToConsole(
+                                $"[ClearPlates] Cleanup failed (dynamic) | uid={uid} | plate={plate} | {ex}"
+                            );
+                        }
+                        finally
+                        {
+                            plate.ClearRefs();
+                        }
+                    }
                 }
-
-                FewTags.playerPlates.Remove(uid);
             }
 
-            if (FewTags.playerStaticPlates.TryGetValue(uid, out var oldStaticPlates))
+            // ---- Static plates ----
+            var staticDict = FewTags.FewTags.FewTags.playerStaticPlates;
+            if (staticDict != null && staticDict.Count > 0)
             {
-                for (int i = 0; i < oldStaticPlates.Count; i++)
+                if (staticDict.TryRemove(uid, out var oldStaticPlates) && oldStaticPlates != null)
                 {
-                    oldStaticPlates[i]?.Cleanup();
+                    foreach (var plate in oldStaticPlates)
+                    {
+                        if (plate == null) continue;
+                        try
+                        {
+                            if (Destroy)
+                            {
+                                if (plate._gameObjectBP != null)
+                                    UnityEngine.Object.Destroy(plate._gameObjectBP);
+                                if (plate._gameObjectM != null)
+                                    UnityEngine.Object.Destroy(plate._gameObjectM);
+                                if (plate._gameObjectID != null)
+                                    UnityEngine.Object.Destroy(plate._gameObjectID);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManager.LogErrorToConsole(
+                                $"[ClearPlates] Cleanup failed (static) | uid={uid} | plate={plate} | {ex}"
+                            );
+                        }
+                        finally
+                        {
+                            plate.ClearRefs();
+                        }
+                    }
                 }
-
-                FewTags.playerStaticPlates.Remove(uid);
             }
 
-            FewTagsUpdater.lastAppliedTags.Remove(uid);
-            FewTagsUpdater.lastBigPlateText.Remove(uid);
+            // ---- Cached state ----
+            FewTagsUpdater.lastAppliedTags?.TryRemove(uid, out _);
+            FewTagsUpdater.lastBigPlateText?.TryRemove(uid, out _);
         }
 
         /// <summary>
         /// Function Call For Changing Weather Or Not To Hide All Tags.
         /// </summary>
-        internal static void ChangeNameplates(bool value)
+        internal static void ChangeNameplates()
         {
-            if (FewTags.p.Count != 0)
+            List<VRC.Player> pSnapshot;
+            lock (FewTags.FewTags.FewTags.Lock)
             {
-                var allPlayers = Utils.AllPlayers; // or assign whatever you're playerlist is
-                if (allPlayers == null || allPlayers.Length == 0) return;
-                for (int i = 0; i < allPlayers.Length; i++)
-                {
-                    var user = allPlayers[i];
-                    VRC.Player player = user?.gameObject?.GetComponent<VRC.Player>();
-                    if (player == null) continue;
+                if (FewTags.FewTags.FewTags.p.Count == 0) return;
+                pSnapshot = new List<VRC.Player>(FewTags.FewTags.FewTags.p);
+            }
 
-                    for (int j = 0; j < FewTags.p.Count; j++)
+            var allPlayers = Utils.AllPlayers;
+            if (allPlayers == null || allPlayers.Length == 0) return;
+
+            for (int i = 0; i < allPlayers.Length; i++)
+            {
+                var user = allPlayers[i];
+                VRC.Player player = user?.gameObject?.GetComponent<VRC.Player>();
+                if (player == null) continue;
+
+                for (int j = 0; j < pSnapshot.Count; j++)
+                {
+                    VRC.Player p = pSnapshot[j];
+                    if (p != null && p == player)
                     {
-                        VRC.Player p = FewTags.p[j];
-                        if (p != null && p == player)
-                        {
-                            ChangePlayerTag(p, value);
-                        }
+                        NameplateESP(p);
                     }
                 }
-
             }
         }
 
@@ -136,36 +168,41 @@ namespace FewTags.FewTags
         /// </summary>
         internal static void NameplateESP(VRC.Player player)
         {
-            if (player._vrcplayer?.Nameplate?.quickStats != null && player._vrcplayer?.Nameplate.field_Public_TextMeshProUGUIEx_4 != null)
+            var nameplate = Utils.GetPlayerNameplateContainer(player);
+            if (nameplate == null) return;
+            var qs = nameplate?.transform.Find("PlayerNameplate/Canvas/NameplateGroup/Nameplate/Contents/Quick Stats")?.gameObject ?? nameplate?.transform.Find("PlayerNameplate/Canvas/NameplateGroup/NameplateFragment/ExpandedInfo")?.gameObject;
+            var tmps = qs?.GetComponentsInChildren<TextMeshProUGUI>(true);
+            if (qs != null && tmps != null && tmps.Length > 0)
             {
-                player._vrcplayer.Nameplate.field_Public_TextMeshProUGUIEx_4.SetOverlay();
+                foreach (var tmp in tmps)
+                {
+                    if (tmp == null) continue;
+                    tmp.SetOverlay();
+                }
             }
         }
 
         public static bool AreMenusOpen(bool ExcludQM = false, bool ExcludeKeyboard = false)
         {
             // QuickMenu cache
-            if (qm == null)
+            if (qmRaycaster == null)
             {
-                qm = Resources.FindObjectsOfTypeAll<GraphicRaycaster>()
-                    .FirstOrDefault(x => x != null && x.name.StartsWith("Canvas_QuickMenu"))?.gameObject;
-                if (qm != null) qmRaycaster = qm.GetComponent<GraphicRaycaster>();
+                qmRaycaster ??= FindRaycaster(new string[] { "Canvas_QuickMenu" });
             }
 
             // MainMenu cache
-            if (bm == null)
+            if (bmRaycaster == null)
             {
-                bm = Resources.FindObjectsOfTypeAll<GraphicRaycaster>()
-                    .FirstOrDefault(x => x != null && x.name.StartsWith("Canvas_MainMenu"))?.gameObject;
-                if (bm != null) bmRaycaster = bm.GetComponent<GraphicRaycaster>();
+                bmRaycaster ??= FindRaycaster(new string[] { "Canvas_MainMenu" });
             }
 
-            // Keyboard cache
-            if (kb == null && bm != null)
+            // Lazy init & cache keyboard raycaster
+            if (!ExcludeKeyboard)
             {
-                var kbTransform = bm.transform.Find("Modal_MM_Keyboard(Clone)");
-                kb = kbTransform?.gameObject;
-                if (kb != null) kbRaycaster = kb.GetComponent<GraphicRaycaster>();
+                kbRaycaster ??= FindRaycaster(new string[] { /*"HeaderOffset", */"Modal_MM_Keyboard" });
+
+                if (kbRaycaster != null && kbRaycaster.enabled)
+                    return true;
             }
 
             // Check states
@@ -180,36 +217,120 @@ namespace FewTags.FewTags
         }
 
         /// <summary>
+        /// Finds a GraphicRaycaster whose GameObject name starts with any of the given prefixes.
+        /// Uses dictionary for O(1)-ish lookup.
+        /// </summary>
+        public static GraphicRaycaster FindRaycaster(string[] nameStartsWith)
+        {
+            try
+            {
+                BuildRaycasterMap();
+
+                if (nameStartsWith.Length == 0) return null;
+
+                for (int i = 0; i < nameStartsWith.Length; i++)
+                {
+                    foreach (var kv in raycasterMap)
+                    {
+                        if (kv.Key == null) continue;
+                        if (kv.Key.StartsWith(nameStartsWith[i], StringComparison.Ordinal))
+                            return kv.Value;
+                    }
+                }
+            }
+            catch { }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Builds the name-prefix → GraphicRaycaster map.
+        /// Only rebuilds if dictionary is null or all cached objects are invalid.
+        /// </summary>
+        private static void BuildRaycasterMap()
+        {
+            try
+            {
+                if (raycasterMap != null)
+                {
+                    foreach (var kv in raycasterMap)
+                    {
+                        if (kv.Value != null)
+                            return; // still valid
+                    }
+                }
+                else
+                {
+
+                    raycasterMap = new Dictionary<string, GraphicRaycaster>();
+                    CanvasGroup[] all = null;
+                    try
+                    {
+                        all = GameObject.FindObjectsOfType<CanvasGroup>() ?? null;
+                    }
+                    catch (TypeInitializationException tie)
+                    {
+                        return; // Don't rebuild the map if type fails
+                    }
+                    catch (Exception ex)
+                    {
+                        return;
+                    }
+
+                    if (all == null || all.Length == 0)
+                        return;
+
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        var obj = all[i]?.gameObject;
+                        if (obj == null || obj.Pointer == IntPtr.Zero) continue;
+
+                        var gr = obj.GetComponentInChildren<GraphicRaycaster>();
+                        if (gr != null && !raycasterMap.ContainsKey(obj.name))
+                            raycasterMap[obj.name] = gr;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
         /// Checks For If NameplateESP Was Toggled.
         /// </summary>
         internal static void CheckNameplateESPBind()
         {
             if (!AreMenusOpen())
             {
-                FewTags.isOverlay = !FewTags.isOverlay;
-                LogManager.LogWarningToConsole($"Nameplate Overlay Was {(FewTags.isOverlay ? "Enabled" : "Disabled")}");
-                if (FewTags.p.Count != 0)
+                FewTags.FewTags.FewTags.isOverlay = !FewTags.FewTags.FewTags.isOverlay;
+                LogManager.LogWarningToConsole($"Nameplate Overlay Was {(FewTags.FewTags.FewTags.isOverlay ? "Enabled" : "Disabled")}");
+
+                // FIXED: snapshot under lock to avoid race condition
+                List<VRC.Player> pSnapshot;
+                lock (FewTags.FewTags.FewTags.Lock)
                 {
-                    var allPlayers = Utils.AllPlayers; // or assign whatever you're playerlist is
-                    if (allPlayers == null || allPlayers.Length == 0) return;
+                    pSnapshot = new List<VRC.Player>(FewTags.FewTags.FewTags.p);
+                }
 
-                    for (int i = 0; i < allPlayers.Length; i++)
+                if (pSnapshot.Count == 0) return;
+
+                var allPlayers = Utils.AllPlayers;
+                if (allPlayers == null || allPlayers.Length == 0) return;
+
+                for (int i = 0; i < allPlayers.Length; i++)
+                {
+                    var user = allPlayers[i];
+                    VRC.Player player = user?.gameObject?.GetComponent<VRC.Player>();
+                    if (player == null) continue;
+
+                    for (int j = 0; j < pSnapshot.Count; j++)
                     {
-                        var user = allPlayers[i];
-                        VRC.Player player = user?.gameObject?.GetComponent<VRC.Player>();
-                        if (player == null) continue;
-
-                        for (int j = 0; j < FewTags.p.Count; j++)
+                        VRC.Player p = pSnapshot[j];
+                        if (p != null && p.Pointer != IntPtr.Zero && p == player)
                         {
-                            VRC.Player p = FewTags.p[j];
-                            if (p != null && p == player)
-                            {
-                                PlateFunctions.NameplateESP(p);
-                            }
+                            PlateFunctions.NameplateESP(p);
                         }
                     }
                 }
-
             }
         }
     }

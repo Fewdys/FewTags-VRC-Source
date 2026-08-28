@@ -18,7 +18,7 @@ namespace FewTags.FewTags
 
             public class Tags
             {
-                public int id { get; set; }
+                public long id { get; set; }
                 public string UserID { get; set; }
                 public string PlateText { get; set; }
                 public string PlateBigText { get; set; }

@@ -1,11 +1,17 @@
-﻿namespace FewTags.FewTags
+﻿using System.Collections.Concurrent;
+
+namespace FewTags.FewTags
 {
     /// <summary>
     /// This Is Pretty Much Just References Used In Other Classes Where Need Be Nowadays -> Consider Looking At Loader.cs
     /// To Those Of You Who Have No Idea What You're Doing... Just Simply Fix You're References And Learn The Absolute Basics And You Should Be Able To Build This For Whatever Loader
     /// </summary>
-    public class FewTags
+    internal class FewTags
     {
+        internal static string url = "https://raw.githubusercontent.com/Fewdys/FewTags/main/FewTags.json";
+
+        internal static readonly object Lock = new object();
+
         internal static int MaxPlatesPerUser, MaxNewlinesPerPlate, MaxPlateSize, FallbackSize, MaxTagLength, UpdateIntervalMinutes;
         internal static bool
             ReplaceInsteadOfSkip,
@@ -20,16 +26,19 @@
             UnderNameplate,
             LimitSize,
             RemoveAlphaTags,
-            RemoveInvalidSpaceTags;
+            RemoveInvalidSpaceTags,
+            DisableBackgrounds;
 
         internal static HashSet<string> BlacklistedUserIDs = new HashSet<string>();
 
-        internal const float Position = -126.95f, PositionTags = -154.95f, PositionID = -98.95f, PositionBigText = 344.75f;
+        internal static float Position = -126.95f, PositionTags = -154.95f, PositionID = -98.95f, PositionBigText = 344.75f;
+        internal static float PositionSelf = 200.05f, PositionFriend = 149.05f, PositionOther = 121.05f;
+        internal static float SpacingExpanded = 78f, BigPlateOffsetExpanded = 700f;
 
         internal static List<VRC.Player> p = new List<VRC.Player>();
 
-        internal static Dictionary<string, List<PlateStatic>> playerStaticPlates = new();
-        internal static Dictionary<string, List<Plate>> playerPlates = new();
+        internal static ConcurrentDictionary<string, List<PlateStatic>> playerStaticPlates = new();
+        internal static ConcurrentDictionary<string, List<Plate>> playerPlates = new();
 
         internal static Jsons.Json._Tags s_tags { get; set; }
         internal static string s_rawTags { get; set; }

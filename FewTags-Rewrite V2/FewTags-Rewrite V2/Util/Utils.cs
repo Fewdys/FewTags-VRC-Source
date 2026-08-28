@@ -2,18 +2,82 @@
 using FewTags.FewTags.Wrappers;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Playables;
+using UnityEngine.UI;
+using UnityEngine.UIElements;
 
 namespace FewTags.FewTags
 {
     public static class Utils
     {
-        internal static System.Random random = new System.Random();
-        internal static readonly HashSet<int> usedNegativeIds = new HashSet<int>();
-        public static List<string> ObjectsToDestroy = new List<string> { "Trust Icon", "Performance Icon", "Performance Text", "Friend Anchor Stats", "Reason", "Shared Connections Icon", "Shared Connections Text" };
         public static VRC.Player[] AllPlayers;
-        private static readonly Regex RemoveHtmlRegex = new Regex(@"<color=[^>]*>|</color>|<b>|</b>|<i>|</i>|<mark=[^>]*>|</mark>|<space=[^>]*>|</space>|<size=[^>]*>|</size>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex RemoveHtmlRegexNoSize = new Regex(@"<color=[^>]*>|</color>|<b>|</b>|<i>|</i>|<mark=[^>]*>|</mark>|<space=[^>]*>|</space>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        internal static System.Random random = new System.Random();
+        internal static readonly HashSet<long> usedNegativeIds = new HashSet<long>();
+        public static List<string> ObjectsToDestroy = new List<string> { "Trust Icon", "Performance Icon", "Performance Text", "Friend Anchor Stats", "Reason", "Shared Connections Icon", "Shared Connections Text", "Spacing", "Earmuffs Icon", "Age Verification Icon", "Performance Rank Icon", "Group Icon" };
 
+        private static readonly Regex RemoveHtmlRegex = new Regex(@"<color=[^>]*>|</color>|<b>|</b>|<i>|</i>|<mark=[^>]*>|</mark>|<space=[^>]*>|</space>|<size=[^>]*>|</size>|<voffset=[^>]*>|</voffset>|<width=[^>]*>|</width>|<rotate=[^>]*>|</rotate>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static readonly Regex RemoveHtmlRegexNoSize = new Regex(@"<color=[^>]*>|</color>|<b>|</b>|<i>|</i>|<mark=[^>]*>|</mark>|<space=[^>]*>|</space>|<voffset=[^>]*>|</voffset>|<width=[^>]*>|</width>|<rotate=[^>]*>|</rotate>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        public static GameObject GetPlayerNameplateContainer(this VRC.Player player)
+        {
+            var vrcplayer = player.gameObject.GetComponent<VRCPlayer>();
+            if (vrcplayer == null || vrcplayer.Pointer == IntPtr.Zero)
+                return null;
+
+            var klass = vrcplayer.GetIl2CppType();
+            if (klass == null || klass.Pointer == IntPtr.Zero)
+            {
+                LogManager.LogErrorToConsole("Could Not Get Class For VRCPlayer");
+                return null;
+            }
+
+            GameObject wantedobj = null;
+
+            var fields = klass.GetFields();
+            foreach (var field in fields)
+            {
+                try
+                {
+                    if (!field.FieldType.Name.Contains("GameObject"))
+                        continue;
+
+                    var value = field.GetValue(vrcplayer);
+                    var gameObject = value?.TryCast<GameObject>();
+
+                    if (gameObject == null || gameObject.Pointer == IntPtr.Zero)
+                        continue;
+
+                    string name;
+                    try
+                    {
+                        name = gameObject.name;
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (name == "NameplateContainer")
+                    {
+                        if (PlateHandlers.VerboseLogging) LogManager.LogToConsole("Found NameplateContainer");
+                        wantedobj = gameObject;
+                        break;
+                    }
+                }
+                catch
+                {
+                    continue;
+                }
+            }
+
+            if (wantedobj == null)
+            {
+
+                LogManager.LogErrorToConsole("Failed To Find NameplateContainer!");
+            }
+
+            return wantedobj;
+        }
         /// <summary>
         /// Sets the color of a TMP_Text component.
         /// </summary>
@@ -122,19 +186,24 @@ namespace FewTags.FewTags
         /// component could be added or found.</returns>
         public static TagAnimator GetOrAddAnimator(this PlateStatic plate, bool BigPlate, bool IDPlate = false, bool MaliciousPlate = false)
         {
-            if (plate.Animator == null && BigPlate)
-                return plate._gameObjectBP?.AddComponent<TagAnimator>();
-            else if (plate.Animator != null && BigPlate)
-                return plate._gameObjectBP?.GetComponent<TagAnimator>();
-            if (plate.Animator == null && IDPlate)
-                return plate._gameObjectID?.AddComponent<TagAnimator>();
-            else if (plate.Animator != null && IDPlate)
-                return plate._gameObjectID?.GetComponent<TagAnimator>();
-            if (plate.Animator == null && MaliciousPlate)
-                return plate._gameObjectM?.AddComponent<TagAnimator>();
-            else if (plate.Animator != null && MaliciousPlate)
-                return plate._gameObjectM?.GetComponent<TagAnimator>();
-
+            if (BigPlate)
+            {
+                if (plate.AnimatorBP != null) return plate.AnimatorBP;
+                plate.AnimatorBP = plate._gameObjectBP?.AddComponent<TagAnimator>();
+                return plate.AnimatorBP;
+            }
+            if (IDPlate)
+            {
+                if (plate.AnimatorID != null) return plate.AnimatorID;
+                plate.AnimatorID = plate._gameObjectID?.AddComponent<TagAnimator>();
+                return plate.AnimatorID;
+            }
+            if (MaliciousPlate)
+            {
+                if (plate.AnimatorM != null) return plate.AnimatorM;
+                plate.AnimatorM = plate._gameObjectM?.AddComponent<TagAnimator>();
+                return plate.AnimatorM;
+            }
             return null;
         }
 
@@ -150,12 +219,8 @@ namespace FewTags.FewTags
         /// component cannot be added.</returns>
         public static TagAnimator GetOrAddAnimator(this Plate plate)
         {
-            if (plate.Animator == null)
-                return plate._gameObject?.AddComponent<TagAnimator>();
-            else if (plate.Animator != null)
-                return plate._gameObject?.GetComponent<TagAnimator>();
-
-            return null;
+            // Capture the tuple result
+            return plate._gameObject?.AddComponent<TagAnimator>();
         }
 
         /// <summary>
@@ -168,41 +233,97 @@ namespace FewTags.FewTags
         }
 
         /// <summary>
-        /// Applies the specified color to the ImageThreeSlice and/or Text components found within the given Transform,
-        /// if present.
+        /// Colors UsersNameplate (Doesn't Exactly Work Anymore)
         /// </summary>
-        /// <remarks>If ImageThreeSlice is set to <see langword="true"/>, the method attempts to locate an
-        /// ImageThreeSlice component in the Transform's children and applies the specified color. If Text is set to
-        /// <see langword="true"/>, the method attempts to locate a TextMeshProUGUI or TextMeshPro component in the
-        /// children and applies the color. If the required component is not found, an error is logged. No action is
-        /// taken if the Transform is null.</remarks>
-        /// <param name="obj">The Transform whose child components will have their color updated. Cannot be null.</param>
-        /// <param name="color">The color to apply to the eligible components.</param>
-        /// <param name="ImageThreeSlice">true to apply the color to the ImageThreeSlice component, if found; otherwise, false. The default is true.</param>
-        /// <param name="Text">true to apply the color to TextMeshProUGUI or TextMeshPro components, if found; otherwise, false. The
-        /// default is false.</param>
-        public static void ColorPlate(this Transform obj, Color color, bool ImageThreeSlice = true, bool Text = false)
+        /// <param name="player"></param>
+        /// <param name="SpeakingAndGlowColor"></param>
+        public static void ColorPlate(VRC.Player player, Color SpeakingAndGlowColor)
         {
-            if (obj == null) return;
-            if (ImageThreeSlice)
+            if (player == null || player.Pointer == IntPtr.Zero || !FewTags.FewTagsEnabled) return;
+
+            var components = player.GetComponent<VRCPlayer>();
+            if (components == null) return;
+            Color pc = Color.white; // GET RANK COLOR HERE!
+            if (pc != null)
             {
-                var imagethreeslice = obj.GetComponentInChildren<ImageThreeSlice>();
-                if (imagethreeslice != null && imagethreeslice.color != color) imagethreeslice.color = color;
-                else if (imagethreeslice == null) LogManager.LogErrorToConsole("Failed To Find ImageThreeSlice On: " + obj.name);
+                _ = ColorUsersNameplate(player, pc, SpeakingAndGlowColor);
             }
-            if (Text)
+        }
+
+        public static async Task ColorUsersNameplate(VRC.Player player, Color color, Color speakcolor)
+        {
+            if (player == null || color == null || speakcolor == null) return;
+            if (color.a == 0f) color.a = 1f;
+            if (speakcolor.a == 0f) speakcolor.a = 1f;
+
+            float alpha = color.a;
+            Color hdrColor = new Color(color.r + 0.3f, color.g + 0.3f, color.b + 0.3f, alpha);
+
+            float alpha2 = speakcolor.a;
+            Color hdrSpeakColor = new Color(speakcolor.r, speakcolor.g, speakcolor.b, alpha2);
+
+            //Color ldrColor = new Color(Mathf.Clamp01(color.r * 2f), Mathf.Clamp01(color.g * 2f), Mathf.Clamp01(color.b * 2f), alpha);
+
+            var vrcplayer = player.GetComponent<VRCPlayer>();
+            while (vrcplayer == null)
             {
-                var text = obj.GetComponentInChildren<TextMeshProUGUI>();
-                if (text == null)
+                await Task.Delay(500);
+                if (player == null || player.Pointer == IntPtr.Zero) return;
+                vrcplayer = player.GetComponent<VRCPlayer>();
+            }
+
+            var nameplate = vrcplayer.Nameplate;
+            while (nameplate == null)
+            {
+                await Task.Delay(500);
+                if (player == null || player.Pointer == IntPtr.Zero) return;
+                nameplate = vrcplayer.Nameplate;
+            }
+
+            var contents = nameplate.gameObject.transform.Find("Contents") ?? nameplate.gameObject.transform.Find("NameplateFragment");
+            while (contents == null || contents.gameObject == null)
+            {
+                await Task.Delay(500);
+                if (player == null || player.Pointer == IntPtr.Zero) return;
+                contents = nameplate.gameObject.transform.Find("Contents") ?? nameplate.gameObject.transform.Find("NameplateFragment");
+            }
+
+            ImageThreeSlice[] threeslices;
+            while (true)
+            {
+                threeslices = contents.GetComponentsInChildren<ImageThreeSlice>(true);
+                if (threeslices.Length >= 4) break;
+                await Task.Delay(500);
+                if (player == null || player.Pointer == IntPtr.Zero) return;
+            }
+
+            foreach (var image in threeslices)
+            {
+                if (image == null || image.gameObject == null) continue;
+                string name = image.gameObject.name;
+
+                if (name.Contains("Background") && image.transform?.parent?.name == "Main" || name.Contains("Background") && image.transform?.parent?.name == "Icon")
                 {
-                    var tmptext = obj.GetComponentInChildren<TextMeshPro>();
-                    if (tmptext != null && tmptext.color != color) tmptext.color = color;
-                    else if (tmptext == null) LogManager.LogErrorToConsole("Failed To Find A Text Component On or In Children For: " + obj.name);
+                    image.CrossFadeColor(hdrColor, 0, true, true, true);
                 }
-                else if (text != null && text.color != color)
+                else if (name.Contains("Status Icon") || name.Contains("Platform") || name.Contains("Pronoun") ||
+                    name.Contains("Stats") || name.Contains("Info") || name.Contains("Few") ||
+                    name.Contains("Nyup") || name.Contains("InteractBackground"))
                 {
-                    text.color = color;
+                    image.CrossFadeColor(hdrColor, 0, true, true, true);
                 }
+                else if (name.Contains("Glow") || name.Contains("Pulse") || name.Contains("Border"))
+                {
+                    image.color = hdrSpeakColor;
+                }
+                else if (name == "Icon")
+                {
+                    image.color = hdrColor;
+                }
+                /*else
+                {
+                    image.color = hdrColor;
+                }*/
             }
         }
 
@@ -210,14 +331,28 @@ namespace FewTags.FewTags
         /// Safely sets the text of a TextMeshPro or TextMeshProUGUI object.
         /// Can be called directly on a TMP_Text instance.
         /// </summary>
-        public static void SetTextSafe(this TMP_Text tmp, string text, bool requireRebuild = false, bool overflow = false)
+        public static void SetTextSafe(this TMP_Text tmp, string text, bool requireRebuild = false, bool overflow = true)
         {
             if (tmp == null) return;
+            if (!tmp.richText) tmp.richText = true;
+            if (tmp.enableAutoSizing) tmp.enableAutoSizing = false;
+            if (!tmp.enableCulling) tmp.enableCulling = true;
             string safeText = text ?? string.Empty;
             bool textChanged = !string.Equals(tmp.text, safeText, System.StringComparison.Ordinal);
             if (textChanged) tmp.text = safeText;
             if (overflow && tmp.overflowMode != TextOverflowModes.Overflow) tmp.overflowMode = TextOverflowModes.Overflow;
             if (requireRebuild && textChanged) tmp.ForceMeshUpdate(true, true);
+
+            var parent = tmp.transform.parent;
+            var parentsparent = parent?.parent;
+            if (parentsparent != null)
+            {
+                var layoutGroup = parentsparent.GetComponent<HorizontalLayoutGroup>();
+                if (layoutGroup != null)
+                {
+                    layoutGroup.childAlignment = TextAnchor.MiddleCenter; // fixes cancer with text not wanting to center on nameplate
+                }
+            }
         }
 
         /// <summary>
@@ -295,16 +430,32 @@ namespace FewTags.FewTags
         /// <summary>
         /// Safely sets the text on a GameObject by finding a TMP_Text component on it.
         /// </summary>
-        public static void SetTextSafe(this GameObject go, string text, bool RequireRebuild = false, bool Overflow = false)
+        public static void SetTextSafe(this GameObject go, string text, bool requireRebuild = false, bool overflow = false)
         {
             if (go == null) return;
 
             var tmp = go.GetComponent<TMP_Text>();
             if (tmp != null)
             {
-                tmp.text = text ?? string.Empty;
-                if (Overflow && tmp.overflowMode != TextOverflowModes.Overflow) tmp.overflowMode = TextOverflowModes.Overflow;
-                if (RequireRebuild) tmp.ForceMeshUpdate(true, true);
+                if (!tmp.richText) tmp.richText = true;
+                if (tmp.enableAutoSizing) tmp.enableAutoSizing = false;
+                if (!tmp.enableCulling) tmp.enableCulling = true;
+                string safeText = text ?? string.Empty;
+                bool textChanged = !string.Equals(tmp.text, safeText, System.StringComparison.Ordinal);
+                if (textChanged) tmp.text = safeText;
+                if (overflow && tmp.overflowMode != TextOverflowModes.Overflow) tmp.overflowMode = TextOverflowModes.Overflow;
+                if (requireRebuild && textChanged) tmp.ForceMeshUpdate(true, true);
+
+                var parent = tmp.transform.parent;
+                var parentsparent = parent?.parent;
+                if (parentsparent != null)
+                {
+                    var layoutGroup = parentsparent.GetComponent<HorizontalLayoutGroup>();
+                    if (layoutGroup != null)
+                    {
+                        layoutGroup.childAlignment = TextAnchor.MiddleCenter; // fixes cancer with text not wanting to center on nameplate
+                    }
+                }
             }
         }
 
@@ -407,12 +558,12 @@ namespace FewTags.FewTags
         /// Gets A Unique Negative Int.
         /// This Can Be Used For Asigning A Unique ID For FewTags Through Per-Say Local Tags Loaded Through A Text File.
         /// </summary>
-        internal static int GetUniqueNegativeId(Jsons.Json._Tags? s_tags)
+        internal static long GetUniqueNegativeId(Jsons.Json._Tags? s_tags)
         {
-            int id;
-            HashSet<int> existingIds = s_tags != null
-                ? new HashSet<int>(s_tags.records.Select(r => r.id))
-                : new HashSet<int>();
+            long id;
+            HashSet<long> existingIds = s_tags != null
+                ? new HashSet<long>(s_tags.records.Select(r => r.id))
+                : new HashSet<long>();
 
             do
             {
@@ -435,15 +586,28 @@ namespace FewTags.FewTags
         /// <summary>
         /// Recursively Finds Child.
         /// </summary>
-        public static Transform RecursiveFindChild(Transform parent, string childName)
+        public static Transform RecursiveFindChild(Transform parent, string childName, bool ContainsName = false, bool StartsWith = false)
         {
             for (int i = 0; i < parent.childCount; i++)
             {
                 var child = parent.GetChild(i);
-                if (child.name == childName)
-                    return child;
+                if (ContainsName && !StartsWith)
+                {
+                    if (child.name.EndsWith(childName))
+                        return child;
+                }
+                else if (ContainsName && StartsWith)
+                {
+                    if (child.name.StartsWith(childName))
+                        return child;
+                }
+                else
+                {
+                    if (child.name == childName)
+                        return child;
+                }
 
-                var result = RecursiveFindChild(child, childName);
+                var result = RecursiveFindChild(child, childName, ContainsName, StartsWith);
                 if (result != null)
                     return result;
             }
@@ -451,15 +615,59 @@ namespace FewTags.FewTags
         }
 
         /// <summary>
+        /// Recursively finds all descendant transforms whose name contains any of the
+        /// given keywords (case-insensitive). Unlike RecursiveFindChild, which stops
+        /// at the first match, this walks the entire subtree and returns every match —
+        /// used to count elements added by other client modules under the nameplate,
+        /// so FewTags plates can offset around them without needing to know exactly
+        /// what those modules are or how many there are ahead of time.
+        /// </summary>
+        public static void RecursiveFindAllContaining(Transform parent, string[] keywords, List<Transform> results)
+        {
+            if (parent == null || keywords == null || results == null) return;
+
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                var child = parent.GetChild(i);
+                string nameLower = child.name.ToLowerInvariant();
+
+                for (int k = 0; k < keywords.Length; k++)
+                {
+                    if (nameLower.Contains(keywords[k]))
+                    {
+                        results.Add(child);
+                        break; // don't double-count a child matching multiple keywords
+                    }
+                }
+
+                RecursiveFindAllContaining(child, keywords, results);
+            }
+        }
+
+        /// <summary>
         /// Destroys Children When Creating A Plate That Is Not Needed.
         /// </summary>
         public static void DestroyChildren(GameObject? obj)
         {
+            if (obj == null) return;
+            var pill = Utils.RecursiveFindChild(obj.transform, "GroupPill", true, true);
+            if (pill != null)
+            {
+                pill.gameObject.SetActive(true);
+
+                var canvasgroup = obj.GetComponent<CanvasGroup>();
+                if (canvasgroup != null) canvasgroup.enabled = false;
+            }
+
             foreach (var name in ObjectsToDestroy)
             {
-                var find = obj?.transform.Find(name);
+                var find = Utils.RecursiveFindChild(obj?.transform, name, true, true);
                 if (find != null)
+                {
+                    if (PlateHandlers.VerboseLogging) LogManager.LogToConsole($"Destroying '{find.name}' (matched '{name}'), childCount={find.childCount}");
                     find.gameObject?.SetActive(false);
+                    find.gameObject?.Destroy();
+                }
             }
         }
     }
