@@ -8,6 +8,7 @@ using FewTags.FewTags_Rewrite_V2;
 using FewTags.FewTags_Rewrite_V2.Managers;
 using Nyup_FewTags._Plate;
 using UnityEngine;
+using UnityStandardAssets.Water;
 
 namespace FewTags.FewTags
 {
@@ -499,65 +500,86 @@ namespace FewTags.FewTags
         /// </summary>
         internal static void UpdatePlayerTags(VRC.Player vrcPlayer, bool Forced = false)
         {
-            if (vrcPlayer == null || vrcPlayer.APIUser == null) return;
-            string uid = vrcPlayer.APIUser.id;
+            if (vrcPlayer == null) return;
+            var apiuser = vrcPlayer.APIUser;
+            if (apiuser == null) return;
+            string uid = apiuser.id;
             if (string.IsNullOrEmpty(uid)) return;
-            var records = FewTags.s_tags?.records;
-            if (records == null) return;
-            Jsons.Json.Tags[] snapshot;
-            try
+
+            _tagLookup.TryGetValue(uid, out var record);
+
+            bool hasLocallyTagged; // ADD BOOLS IF YOU DO CUSTOM DB CHECKING
+            List<string> localTagsCopy = null;
+
+            var lockSw = System.Diagnostics.Stopwatch.StartNew();
+            lock (LocalTags.Lock)
             {
-                snapshot = records.ToArray();
+                lockSw.Stop();
+                if (lockSw.ElapsedMilliseconds > 2)
+                    LogManager.LogWarningToConsole($"[FewTags] Lock contention in UpdatePlayerTags: waited {lockSw.ElapsedMilliseconds}ms for uid={uid}");
+
+                /// 
+                /// Custom DB Checking Here If Wanted
+                /// 
+
+                hasLocallyTagged = LocalTags.LocallyTagged.ContainsKey(uid);
+
+                if (LocalTags.LocallyTaggedByID.TryGetValue(uid, out var rawList))
+                    localTagsCopy = new List<string>(rawList);
             }
-            catch { return; }
+            bool hasExternal = hasLocallyTagged || localTagsCopy != null;
 
-            var record = snapshot.FirstOrDefault(r => r.UserID == uid);
-            /// 
-            /// Custom Tag Checking Here If Wanted
-            /// 
-            bool hasExternal = LocalTags.LocallyTagged.ContainsKey(uid)|| LocalTags.LocallyTaggedByID.ContainsKey(uid); // LOCAL TAGS !!
-            ///
-            /// End
-            /// 
+            int capacity = (localTagsCopy?.Count ?? 0) + (record?.Tag?.Length ?? 0);
 
-            if (record == null && !hasExternal) return;
+            var effectiveTags = new List<string>(capacity);
 
-            var effectiveTags = new List<string>();
-            /// 
-            /// Custom Tag Checking Here If Wanted
-            /// 
-            if (LocalTags.LocallyTaggedByID.TryGetValue(uid, out var localTags)) // LOCAL TAGS !!
-            {
-                for (int i = 0; i < localTags.Count; i++)
+            if (localTagsCopy != null)
+                for (int i = 0; i < localTagsCopy.Count; i++)
                 {
-                    var tag = localTags[i];
-                    if (string.IsNullOrEmpty(tag)) continue;
-                    effectiveTags.Add(Utils.AddLocalTagPrefix(tag));
+                    var tag = localTagsCopy[i];
+                    if (!string.IsNullOrEmpty(tag))
+                        effectiveTags.Add(Utils.AddLocalTagPrefix(tag));
                 }
-            }
+
             ///
-            /// End
+            /// ADD CUSTOM DB TAGS TO EFFECTIVE TAGS HERE
             /// 
-            if (record?.Tag != null) effectiveTags.AddRange(record.Tag);
-            effectiveTags = effectiveTags.Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(System.StringComparer.OrdinalIgnoreCase).ToList();
+
+            if (record?.Tag != null)
+            {
+                var remoteTags = record.Tag;
+                for (int i = 0; i < remoteTags.Length; i++)
+                    if (!string.IsNullOrWhiteSpace(remoteTags[i]))
+                        effectiveTags.Add(remoteTags[i]);
+            }
+
+            var seen = new HashSet<string>(effectiveTags.Count, StringComparer.OrdinalIgnoreCase);
+            for (int i = effectiveTags.Count - 1; i >= 0; i--)
+                if (string.IsNullOrWhiteSpace(effectiveTags[i]) || !seen.Add(effectiveTags[i]))
+                    effectiveTags.RemoveAt(i);
 
             string[] currentTags = effectiveTags.ToArray();
             string bigPlate = record?.PlateBigText ?? string.Empty;
+            string[] normalizedCurrent = Utils.NormalizeTags(currentTags);
 
-            bool changed = !lastAppliedTags.TryGetValue(uid, out var prevTags) || !Utils.NormalizeTags(prevTags).SequenceEqual(Utils.NormalizeTags(currentTags));
+            bool changed;
+            if (!lastAppliedTags.TryGetValue(uid, out var prevTags))
+                changed = true;
+            else
+            {
+                string[] normalizedPrev = _normalizedTagCache.GetOrAdd(uid, _ => Utils.NormalizeTags(prevTags));
+                changed = !normalizedPrev.SequenceEqual(normalizedCurrent);
+            }
 
-            bool bigChanged = !lastBigPlateText.TryGetValue(uid, out var prevBig) || !string.Equals(prevBig?.Trim(), bigPlate?.Trim(), System.StringComparison.OrdinalIgnoreCase);
+            bool bigChanged = !lastBigPlateText.TryGetValue(uid, out var prevBig)
+                || !string.Equals(prevBig?.Trim(), bigPlate?.Trim(), StringComparison.OrdinalIgnoreCase);
 
             if (changed || bigChanged || Forced)
             {
-                ///
-                /// These Two Log Messages Are For Debugging You Can Comment Them Out!!
-                /// 
-                LogManager.LogWarningToConsole($"Tags changed for {uid}: prev=[{string.Join(",", prevTags ?? System.Array.Empty<string>())}], curr=[{string.Join(",", currentTags ?? System.Array.Empty<string>())}]");
-                LogManager.LogWarningToConsole($"BigPlate changed for {uid}: prev=[{prevBig ?? "null"}], curr=[{bigPlate ?? "null"}]");
-                ///
-                /// End
-                ///
+                lastAppliedTags[uid] = currentTags;
+                lastBigPlateText[uid] = bigPlate;
+                _normalizedTagCache[uid] = normalizedCurrent;
+
                 PlateHandlers.PlateHandler(vrcPlayer);
             }
         }
@@ -628,28 +650,7 @@ namespace FewTags.FewTags
             }
         }
 
-        /// <summary>
-        /// Update All Players Tags In The Instance.
-        /// Call Me 
-        /// </summary>
-        internal static void UpdateAllPlayersTagsLive()
-        {
-            var allPlayers = Utils.AllPlayers;
-            if (allPlayers == null || allPlayers.Length == 0) return;
-            for (int i = 0; i < allPlayers.Length; i++)
-            {
-                var player = allPlayers[i];
-                if (player == null) continue;
-
-                var vrcPlayer = player.gameObject?.GetComponent<VRC.Player>();
-                if (vrcPlayer != null)
-                {
-                    UpdatePlayerTags(vrcPlayer);
-                }
-            }
-        }
-
-        public static IEnumerator UpdateAllPlayersOnMainThread(bool forced = false)
+        public static IEnumerator UpdateAllPlayersOnMainThread(bool forced = false) // live update
         {
             yield return null;
 
@@ -678,7 +679,7 @@ namespace FewTags.FewTags
             }
         }
 
-        public static IEnumerator ReloadPlates()
+        public static IEnumerator ReloadPlates() // live update - recreates plates for each player
         {
             yield return null;
 
