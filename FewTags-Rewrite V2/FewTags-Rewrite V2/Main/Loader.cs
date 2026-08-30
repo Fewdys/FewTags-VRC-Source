@@ -21,7 +21,7 @@ namespace FewTags.FewTags
     {
         public const string PLUGIN_GUID = "com.Fewdy.FewTags";
         public const string PLUGIN_NAME = "FewTags";
-        public const string PLUGIN_VERSION = "3.0.8";
+        public const string PLUGIN_VERSION = "3.087.5";
     }
 
     [BepInPlugin(PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
