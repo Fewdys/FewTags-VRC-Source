@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text.Json;
+using FewTags.FewTags.JSON;
 using FewTags.FewTags_Rewrite_V2;
 using FewTags.FewTags_Rewrite_V2.Managers;
 using Nyup_FewTags._Plate;
@@ -436,49 +437,57 @@ namespace FewTags.FewTags
                 return;
             }
 
-            FewTagsResolver.EnsureRegistered();
-
-            FewTags.s_rawTags = System.Text.Encoding.UTF8.GetString(rawJsonBytes);
+            string json = System.Text.Encoding.UTF8.GetString(rawJsonBytes);
+            FewTags.s_rawTags = json;
 
             try
             {
-                List<Jsons.Json.Tags> records = null;
-
+                JSONNode root;
                 try
                 {
-                    int i = 0;
-                    while (i < rawJsonBytes.Length && (rawJsonBytes[i] == ' ' || rawJsonBytes[i] == '\t' || rawJsonBytes[i] == '\r' || rawJsonBytes[i] == '\n'))
-                        i++;
-
-                    bool isArray = i < rawJsonBytes.Length && rawJsonBytes[i] == (byte)'[';
-
-                    records = isArray ? JsonSerializer.Deserialize<List<Jsons.Json.Tags>>(rawJsonBytes) : JsonSerializer.Deserialize<Jsons.Json._Tags>(rawJsonBytes)?.records;
+                    root = JSON.JSON.Parse(json);
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
-                    LogManager.LogErrorToConsole($"JSON deserialize failed (both formats): {ex.Message}");
+                    LogManager.LogErrorToConsole($"JSON parse failed: {ex.Message}");
                     return;
                 }
 
-                if (records == null)
+                JSONArray recordsArray = root.IsArray ? root.AsArray : root["records"].AsArray;
+
+                if (recordsArray == null)
                 {
                     LogManager.LogErrorToConsole("Deserialized records list is null.");
                     return;
                 }
 
-                var newTags = new Jsons.Json._Tags { records = records };
-                var newEntries = new List<(string uid, Jsons.Json.Tags entry)>(records.Count);
+                var records = new List<Jsons.Json.Tags>(recordsArray.Count);
+                var newEntries = new List<(string uid, Jsons.Json.Tags entry)>(recordsArray.Count);
 
-                for (int i = 0; i < records.Count; i++)
+                foreach (JSONNode node in recordsArray.Children)
                 {
-                    var entry = records[i];
-                    if (entry.Tag == null)
-                        entry.Tag = System.Array.Empty<string>();
+                    var entry = new Jsons.Json.Tags
+                    {
+                        id = node["id"].AsLong,
+                        UserID = node["UserID"].Value,
+                        PlateText = node["PlateText"].Value,
+                        PlateBigText = node["PlateBigText"].Value,
+                        Malicious = node["Malicious"].AsBool,
+                        Active = node["Active"].AsBool,
+                        TextActive = node["TextActive"].AsBool,
+                        BigTextActive = node["BigTextActive"].AsBool,
+                        Size = node["Size"].Value,
+                        Tag = node["Tag"].IsArray
+                            ? node["Tag"].Children.Select(c => c.Value).ToArray()
+                            : Array.Empty<string>()
+                    };
+
+                    records.Add(entry);
                     if (!string.IsNullOrEmpty(entry.UserID))
                         newEntries.Add((entry.UserID, entry));
                 }
 
-                FewTags.s_tags = newTags;
+                FewTags.s_tags = new Jsons.Json._Tags { records = records };
 
                 _tagLookup.Clear();
                 for (int i = 0; i < newEntries.Count; i++)
@@ -488,7 +497,7 @@ namespace FewTags.FewTags
 
                 LogManager.LogToConsole($"Loaded {records.Count} records.");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 LogManager.LogErrorToConsole($"LoadTags error: {ex.Message}");
             }
